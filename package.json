@@ -10,5 +10,7 @@
 		"crypto": "~0.0.3",
 		"gravatar": "~1.0.6"
 	},
-	"start": "app.js"
+	"scripts": {
+    "start": "app.js"
+ }
 }
