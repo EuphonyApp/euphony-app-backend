@@ -1,7 +1,6 @@
 {
 	"name": "euphony-node",
 	"version": "0.0.1",
-	"main": "app.js",
 	"dependencies": {
 		"express": "~4.0.0",
 		"mongoose": "~3.8.8",
@@ -10,5 +9,6 @@
 		"nodemailer": "~0.6.3",
 		"crypto": "~0.0.3",
 		"gravatar": "~1.0.6"
-	}
+	},
+	"start": "app.js"
 }
