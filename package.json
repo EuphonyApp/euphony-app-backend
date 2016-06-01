@@ -11,6 +11,6 @@
 		"gravatar": "~1.0.6"
 	},
 	"scripts": {
-    "start": "app.js"
+    "start": "node app.js"
  }
 }
