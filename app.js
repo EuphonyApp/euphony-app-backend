@@ -2,8 +2,9 @@ var express = require('express');
 var connect = require('connect');
 var app = express();
 var mongoose = require('mongoose');
+var mongouri = process.env.MONGO_URI;
 
-mongoose.connect('mongodb://127.0.0.1:27017/node-euphony');
+mongoose.connect(mongouri);
 console.log("Connected to db");
 
 var port = process.env.PORT || 8080;
