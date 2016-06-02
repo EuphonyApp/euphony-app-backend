@@ -64,13 +64,12 @@ module.exports = function(app) {
 		console.log(req.query.f_id);
 
 		if(req.query.f_id != "NO") {
-			Artist.find({ f_id: req.query.f_id }, function(artists, err) {
+			Artist.find({ 'f_id': req.query.f_id }, function(err, artists) {
 
 				if(err) {
 					console.log(err);
 					if(artists == null) {
 						console.log("here");
-						console.log(a);
 						res.json(a);
 					}
 					else {
@@ -99,12 +98,12 @@ module.exports = function(app) {
 					artist.utube = artists[0].utube;
 					artist.pic = artists[0].pic;
 
-					console.log("Sent artist from fb");
+					console.log("Sent artist from fb" + artist.name);
 					res.json(artist);
 				}
 			});
 		} else if(req.query.g_id != "NO") {
-			Artist.find({ g_id: req.query.g_id }, function(artists, err) {
+			Artist.find({ 'g_id': req.query.g_id }, function(err, artists) {
 
 				if(err) {
 					console.log(err);
@@ -135,7 +134,7 @@ module.exports = function(app) {
 					artist.utube = artists[0].utube;
 					artist.pic = artists[0].pic;
 
-					console.log("Sent artist from g+");
+					console.log("Sent artist from g+" + artist);
 					res.json(artist);
 				}
 			});
