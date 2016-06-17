@@ -2,7 +2,8 @@ var express = require('express');
 var connect = require('connect');
 var app = express();
 var mongoose = require('mongoose');
-var mongouri = "mongodb://pro:2831@ds023603.mlab.com:23603/euphony2";
+var mongouri = "mongodb://pro:2831@ds017514.mlab.com:17514/euphony";
+
 
 mongoose.connect(mongouri);
 console.log("Connected to db");
