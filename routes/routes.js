@@ -12,7 +12,8 @@ function UserSchema() {
 		f_id: String,
 		g_id: String,
 		pic: String,
-		following: [String]
+		following: [String],
+		followers: [String]
 	});
 };
 
@@ -24,16 +25,19 @@ var ArtistSchema = new UserSchema({
 	subGenre: String,
 	fbPage: String,
 	utube: String,
-	followers: [String]
+	bands: [String]
 });
 
 var VenueSchema = new UserSchema({
-	email: String
+	venue_name: String,
+	email: String,
+	contact: String,
+	minCapacity: String,
+	maxCapacity: String
 });
 
 var BandSchema = new UserSchema({
-	memebers: [String],
-	followers: [String]
+	members: [String]                     // add details
 });
 
 var User = mongoose.model('User', new UserSchema());
@@ -85,10 +89,12 @@ module.exports = function(app) {
 					user.pic = doc.pic;
 					user.location = doc.location;
 
-					if(doc.type == "bands")
+					if(doc.type == "band")
 						user.members = doc.members.length;
-					else
+					else {
 						user.members = 0;
+						user.type = doc.genre;
+					}
 
 					user.no_followers = doc.followers.length;
 					if(doc.followers.indexOf(req.query.cur_id) > -1)
@@ -124,7 +130,9 @@ module.exports = function(app) {
 				user.type = docs[0].type;
 				user.pic = docs[0].pic;
 
-				if(docs[0].type != venue) {
+				    if(docs[0].type != "artist")
+					    user.type = docs[0].genre;
+
 					if(docs[0]._id == req.query.cur_id) 
 						user.followOrno = "";
 					else if(docs[0].followers.indexOf(req.query.cur_id) > -1) 
@@ -132,10 +140,6 @@ module.exports = function(app) {
 					else
 						user.followOrno = "no";
 					users.push(user);
-				} else {
-					user.followOrno = "";
-					users.push(user);
-				}
 
 				if(x == 1)
 					res.json(users);
@@ -238,6 +242,20 @@ module.exports = function(app) {
 		});
 	});
 
+	app.post('/venue', function(req, res) {
+		var venue = new Venue(req.body);
+
+		venue.save(function(err) {
+			if(err) {
+				console.log("Error while creating venue" + err);
+				res.send(err);
+			} else {
+				console.log("created venue"+ artist);
+				res.json(venue._id);
+			}
+		});
+	});
+
 	app.get('/artist', function(req, res) {
 		Artist.find({ _id: req.query.id }, function(err, artists) {
 			if(err) {
@@ -271,5 +289,103 @@ module.exports = function(app) {
 			});
 		});
 	});
-	
+
+	app.get("/usersInPart", function(req, res) {
+		var total = req.query.total;
+		var offset = req.query.offset;
+		var type = req.query.type;
+
+		var user = {};
+		var users = [];
+
+		var q = User.find({ type : type }).skip(offset).limit(total);
+		q.exec(function(err, docs) { 
+			var x = docs.length;
+
+			if(docs.length == 0) {
+				return res.json(users);
+			} else {
+
+			docs.forEach(function(doc) {
+				if(doc._id != req.query.cur_id) {
+
+					console.log(doc);
+					user._id = doc._id;
+					user.name = doc.name;
+					user.type = doc.type;
+					user.pic = doc.pic;
+					user.location = doc.location;
+
+					if(type == "bands")
+						user.members = doc.members.length;
+					else {
+						user.members = 0;
+						user.type = doc.genre;
+					}
+
+					user.no_followers = doc.followers.length;
+					if(doc.followers.indexOf(req.query.cur_id) > -1)
+						user.followOrnot = "yes";
+					else
+						user.followOrnot = "no";
+					users.push(user);
+				}
+				
+				if(x == 1) {
+						console.log(total + offset + type + x);
+						console.log(users);
+						res.json(users);
+					}
+					else
+						--x;
+			});
+		}
+		});
+	});
+
+	app.get('/band/list', function(req, res) {
+
+		var user = {};
+		var users = [];
+		var ids = [];
+
+		User.find({ id : req.query.cur_id }, function(err, artist) {
+
+			if(err)
+				res.send(err);
+			else {
+				ids = artist[0].bands;
+				var x = ids.length;
+				if(x == 0) {
+					res.json(users);
+				}
+
+				ids.forEach(function(id) {
+
+					Band.find({ id: id }, function(doc) {
+						user._id = doc._id;
+						user.name = doc.name;
+						user.type = doc.type;
+						user.pic = doc.pic;
+						user.location = doc.location;
+						user.members = doc.members;
+						user.no_followers = doc.followers.length;
+
+						if(doc.followers.indexOf(req.query.cur_id) > -1)
+							user.followOrnot = "yes";
+						else
+							user.followOrnot = "no";
+
+						users.push(user);
+					});
+
+
+						if(x == 1)
+							res.json(users);
+					    else
+							 --x;
+				});
+			}
+	});
+	});
 }
