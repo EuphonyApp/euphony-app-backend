@@ -37,7 +37,9 @@ var VenueSchema = new UserSchema({
 });
 
 var BandSchema = new UserSchema({
-	members: [String]                     // add details
+	members: [String], 
+	contact: String,
+	fbPage: String                    // add details
 });
 
 var User = mongoose.model('User', new UserSchema());
@@ -46,6 +48,11 @@ var Venue = User.discriminator('Venue', VenueSchema);
 var Band = User.discriminator('Band', BandSchema);
 
 module.exports = function(app) {
+
+	app.get('/', function(req, res) {
+	res.json({ message: 'welcome to our api!' });	
+   });
+
 	app.get('/id', function(req, res) {
 		if(req.query.f_id != "no") {
 			User.find({ f_id: req.query.f_id}, function(err, docs) {
@@ -195,7 +202,7 @@ module.exports = function(app) {
 			var index = docs[0].followers.indexOf(req.query.cur_user);
 
 			if(index > -1) {
-				docs[0].followers.splice(x, 1);
+				docs[0].followers.splice(index, 1);
 			}
 
 			docs[0].save(function(err) {
@@ -207,11 +214,11 @@ module.exports = function(app) {
 						console.log("nfollow err "+ err);
 						res.end(err);
 					}
-					var index = users[0].followers.indexOf(req.query.unfollow);
+					var index = users[0].following.indexOf(req.query.unfollow);
 
 					if(index > -1) {
-						docs[0].followers.splice(x, 1);
-						docs[0].save(function(err) {
+						users[0].following.splice(index, 1);
+						users[0].save(function(err) {
 							if(err) {
 								console.log(err);
 								res.end(err);
@@ -242,6 +249,34 @@ module.exports = function(app) {
 		});
 	});
 
+	app.post('/band', function(req, res) {
+		var band = new Band(req.body);
+
+		band.save(function(err) {
+			if(err) {
+				console.log("Error while creating band " + err);
+				res.end(err);
+			} else {
+
+				Artist.find({_id: band.members[0]}, function(err, docs) {
+					if(err)
+						res.send(err);
+					else {
+						docs[0].bands.push(band._id);
+						docs[0].save(function(err) {
+							if(err)
+								res.send(err);
+							else {
+								console.log("created " + band + docs[0].bands);
+				        		res.json(band._id);
+							}
+						});
+					}
+				});
+			}
+		});
+	});
+
 	app.post('/venue', function(req, res) {
 		var venue = new Venue(req.body);
 
@@ -262,10 +297,15 @@ module.exports = function(app) {
 				console.log("error while sending artist");
 				res.end(err);
 			} else {
+				if(artists.length != 0) {
 				var artist = artists[0];
 				console.log("SEnt" + artist);
 				res.json(artist);
+			} else {
+				var a  = new Artist();
+				res.json(a);
 			}
+		}
 		});
 	});
 
@@ -301,6 +341,7 @@ module.exports = function(app) {
 		var q = User.find({ type : type }).skip(offset).limit(total);
 		q.exec(function(err, docs) { 
 			var x = docs.length;
+			console.log(x);
 
 			if(docs.length == 0) {
 				return res.json(users);
@@ -349,43 +390,125 @@ module.exports = function(app) {
 		var users = [];
 		var ids = [];
 
-		User.find({ id : req.query.cur_id }, function(err, artist) {
+		User.find({ _id : req.query.cur_id }, function(err, artist) {
 
-			if(err)
+			if(err) {
+				console.log(err);
 				res.send(err);
+			}
 			else {
 				ids = artist[0].bands;
 				var x = ids.length;
+
+				console.log(ids);
+
 				if(x == 0) {
+					console.log(users.length);
 					res.json(users);
 				}
 
 				ids.forEach(function(id) {
 
-					Band.find({ id: id }, function(doc) {
-						user._id = doc._id;
-						user.name = doc.name;
-						user.type = doc.type;
-						user.pic = doc.pic;
-						user.location = doc.location;
-						user.members = doc.members;
-						user.no_followers = doc.followers.length;
+					Band.find({ _id: id }, function(err, doc) {
+						if(err)
+							res.send(err);
+						else {
 
-						if(doc.followers.indexOf(req.query.cur_id) > -1)
+						user._id = doc[0]._id;
+						user.name = doc[0].name;
+						user.type = doc[0].type;
+						user.pic = doc[0].pic;
+						user.location = doc[0].location;
+						user.members = doc[0].members.length;
+						user.no_followers = doc[0].followers.length;
+
+						if(doc[0].followers.indexOf(req.query.cur_id) > -1)
 							user.followOrnot = "yes";
 						else
 							user.followOrnot = "no";
 
 						users.push(user);
-					});
-
-
-						if(x == 1)
+						if(x == 1) {
+							console.log(users);
 							res.json(users);
+						}
 					    else
 							 --x;
+					}
+					});
 				});
 			}
 	});
+	});
+
+	app.get("/band/add/artist", function(req, res) {
+
+		Band.find({ _id: req.query.band_id }, function(err, docs) {
+			if(err)
+				res.send(err);
+			else {
+				if(docs[0].members.indexOf(req.qery.id > - 1)) {
+					console.log("already added");
+					res.json("alread added");
+				}
+				docs[0].members.push(req.query.id);
+				docs[0].save(function(err) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						Artist.find({_id: req.query.id}, function(err, artist) {
+							if(err)
+								res.send(err);
+							else {
+								artist[0].bands.push(req.query.band_id);
+								artist[0].save(function(err) {
+									if(err) {
+										console.log(err);
+										res.send(err);
+									} else {
+										console.log("added");
+										res.json("added");
+									}
+								});
+							}
+						});
+					}
+				});
+			}
+		});
+	});
+
+	app.get("/artists/name", function(req, res) {
+		var user = {};
+		var users = [];
+
+		Artist.find({name: {"$regex": req.query.name, "$options": "i"}, _id: {'$ne': req.query.cur_id}}, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				if(docs.length == 0) {
+					console.log("No artist");
+					res.send(users);
+					} else {
+						var x =  docs.length;
+						docs.forEach(function(doc) {
+							user._id = doc._id;
+					        user.name = doc.name;
+					        user.type = doc.genre;
+					        user.pic = doc.pic;
+					        user.followOrno = "no";
+
+					        users.push(user);
+					        if( x == 1) {
+					        	console.log("sent all");
+					        	res.json(users);
+					        } else
+					           --x;
+						});
+				}
+			}
+		});
 	});
 }
