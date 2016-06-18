@@ -2,7 +2,7 @@ var express = require('express');
 var connect = require('connect');
 var app = express();
 var mongoose = require('mongoose');
-var mongouri = "mongodb://pro:2831@ds017514.mlab.com:17514/euphony";
+var mongouri = "mongodb://pro:softs_2831@ds017514.mlab.com:17514/euphony";
 
 
 mongoose.connect(mongouri);
