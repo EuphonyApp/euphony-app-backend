@@ -34,8 +34,16 @@ io.on('connection', function(socket) {
 		user.socket_id = socket.id;
 		user.online = "no";
 		console.log(user);
+		var x = clients.every(function(client) {
+			if(client.id == id) {
+				//io.to(client.socket_id).emit('message', { 'message': data, 'frm': frm});
+				return false;
+			} else
+				return true;
+		});
 
-		clients.push(user);
+		if(x == false)
+			clients.push(user);
 
 		PendingConversation.find({ to: id }, function(err, messages) {
 			if(err)
