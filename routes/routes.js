@@ -49,8 +49,8 @@ var BandSchema = new UserSchema({
 
 var LocationSchema = new Schema({
 	user_id: String,
-	coords: { type: [Number], index: '2d' },
-	timestamp: { type: Date, default: Date.now }
+	track: String,
+	coords: { type: [Number], index: '2d' }
 });
 
 var BookingSchema = new Schema({						// thinking of storing booking details as individual transactions in 
@@ -268,7 +268,19 @@ module.exports = function(app) {
 				res.end(err);
 			} else {
 				console.log("created " + artist);
-				res.json(artist._id);
+
+				var location = new Location();
+				location.user_id = artist._id;
+
+				location.save(function(err) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						console.log("locatio created");
+						res.json(artist._id);
+					}
+				});
 			}
 		});
 	});
@@ -341,7 +353,7 @@ module.exports = function(app) {
 		
 			var artist = new Artist(item);
 			artist.fbPage = "";
-			artist.dis = "	";
+			artist.dis = "";
 			artist.scloud = "";
 			artist.twitter="";
 
@@ -570,22 +582,6 @@ module.exports = function(app) {
 		});
 	});
 
-	app.post("/location", function(req, res) {						//create the location of user 
-																	//param is the user id, lat and long
-		var location = new Location(req.body);						//called only the first time, (update) location will be called afterwards
-		location.timestamp = Date.now;
-
-		location.save(function(err) {
-			if(err) {
-				console.log(err);
-				res.send(err);
-			} else {
-				console.log("location created");
-				res.json("created");
-			}
-		});
-	});
-
 	app.get("/location", function(req, res) {												//getting the location of an user
 
 		var location = new Location();
@@ -607,15 +603,15 @@ module.exports = function(app) {
 
 	app.post("/update/location", function(req, res) {												//periodic update location funciton
 																									// calls multiple time for frequent update
-		Location.find({ user_id: req.query.user_id }, function(err, docs) {
+		Location.find({ user_id: req.query.id }, function(err, docs) {
 			if(err) {
 				console.log(err);
 				res.send(err);
 			} else {
 				console.log(docs[0]);
-				docs[0].timestamp = Date.now;														// show the time of update, most recent is saved
 				docs[0].coords.push(req.query.longitude);
-				docs[0].coords.push(req.query.latitude);											// params are lat, long and user_id
+				docs[0].coords.push(req.query.latitude);	
+				docs[0].track = "yes";										// params are lat, long and user_id
 
 				docs[0].save(function(err) {
 					if(err) {
@@ -631,10 +627,32 @@ module.exports = function(app) {
 
 	});
 
+	app.post('/stop/tracking', function(req, res) {
+		Location.find({user_id: req.query.id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				docs[0].track = "no";
+				docs[0].save(function(err) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						console.log(docs[0]);
+						res.send("stopped");
+					}
+				});
+			}
+		});
+	});
+
 	app.get("/nearby", function(req, res) {
 
 		var maxDistance = 30;                               ///max distance to search users from 
-		maxDistance /= 6371;                               /// divided by earth radius
+		maxDistance /= 6371; 
+
+		var artists = [];                              /// divided by earth radius
 
 		var coords = [];
 		coords[0] = req.query.longitude;                    // params are lat and long of current user
@@ -850,7 +868,7 @@ module.exports = function(app) {
 					var x = docs.length;
 					docs.forEach(function(doc) {
 
-						doc.dis = "20km";
+						doc.dis = "";
 						artists.push(doc);
 
 						if(x == 1) {
@@ -868,5 +886,29 @@ module.exports = function(app) {
 				}
 			}
 		});  
+	});
+
+	app.post('/update/artist', function(req, res) {
+		Artist.findByIdAndUpdate(req.body._id, req.body, {new: true}, function(err, user) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				console.log(user);
+				res.send("updated");
+			}
+		});
+	});
+
+	app.post('/update/venue', function(req, res) {
+		Venue.findByIdAndUpdate(req.body._id, req.body, {new: true}, function(err, user) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				console.log(user);
+				res.send("upated");
+			}
+		});
 	});
 }
