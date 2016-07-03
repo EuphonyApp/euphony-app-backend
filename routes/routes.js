@@ -245,14 +245,14 @@ module.exports = function(app) {
 							});
 
 							if(total > 0) {
-								followNotify.details = docs[0].name + " and " + total + " others are now following You.";
+								followNotify.details = users[0].name + " and " + total + " others are now following You.";
 								followNotify.type = "multi_follow";
 							} else {
-								followNotify.details = docs[0].name + " is now following You.";
+								followNotify.details = users[0].name + " is now following You.";
 								followNotify.type = "single_follow";
 							}
 
-							followNotify.pic = docs[0].pic;
+							followNotify.pic = users[0].pic;
 							followNotify.option = "no";
 							followNotify.seen = "no";	
 
