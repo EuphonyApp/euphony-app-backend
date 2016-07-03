@@ -2,6 +2,10 @@ var util = require('util');
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 var Conversation = require('../models/conversation.js'); 
+var FCM = require('fcm-push');
+
+var serverKey = 'AIzaSyCrSeEQvwb8p3JDfu8zrEGndextsD0mHu8';
+var fcm = new FCM(serverKey);
 
 function UserSchema() {
 	Schema.apply(this, arguments);
@@ -15,7 +19,9 @@ function UserSchema() {
 		pic: String,
 		fbPage: String,
 		following: [String],
-		followers: [String]
+		followers: [String],
+		notifications: [String],
+		gcm_token: String
 	});
 };
 
@@ -55,8 +61,33 @@ var LocationSchema = new Schema({
 });
 
 var BookingSchema = new Schema({						// thinking of storing booking details as individual transactions in 
-	booked: String,											// instead of storing in the artist, venue models
-	bookedBy: String									
+	booked: String,	
+	booked_id: String,										// instead of storing in the artist, venue models
+	bookedBy: String,
+	bookedBy_id: String,
+	time: String,
+	date: String,
+	type: String,
+	status: String									
+});
+
+var JammingSchema = new Schema({						// thinking of storing booking details as individual transactions in 
+	sender: String,	
+	sender_id: String,										// instead of storing in the artist, venue models
+	sent_to_id: String,
+	sent_to: String,
+	time: String,
+	date: String,
+	status: String									
+});
+
+var NotificationSchema = new Schema({
+	details: String,
+	pic: String,
+	seen: String,
+	option: String,
+	type: String,
+	attached_id: String
 });
 
 var User = mongoose.model('User', new UserSchema());
@@ -66,6 +97,8 @@ var Band = User.discriminator('Band', BandSchema);
 var Location = mongoose.model('Location', LocationSchema);
 
 var Booking = mongoose.model('Booking', BookingSchema);
+var Jamming = mongoose.model('Jamming', JammingSchema);
+var Notification = mongoose.model('Notification', NotificationSchema);
 
 module.exports = function(app) {
 
@@ -87,7 +120,7 @@ module.exports = function(app) {
 				}
 			});
 		} else if(req.query.g_id != "no") {																	// if signed in google+
-			User.find({ g_id: req.query.g_id }, function(req, res) {
+			User.find({ g_id: req.query.g_id }, function(err, docs) {
 				if(err)
 					res.end(err);
 				else if(docs.length != 0) {
@@ -176,7 +209,9 @@ module.exports = function(app) {
 		});
 	});
 
-	app.post('/follow', function(req, res) {														//function for "follow" event
+	app.post('/follow', function(req, res) {	
+	var followNotify = new Notification();
+														//function for "follow" event
 		User.find({ _id: req.query.follow }, function(err, docs) {									// params "cur_user" id, "follow" id to follow
 			if(err) {
 				console.log("follow error " + err);
@@ -198,14 +233,66 @@ module.exports = function(app) {
 					users[0].following.push(req.query.follow);
 					users[0].save(function(err) {
 						if(err) {
-							console.log("saving failed while following "+ err);
-							res.end(err);
+							console.log(err);
+							res.send(err);
 						} else {
+							var total = 0;
+							docs[0].notifications.forEach(function(notification) {
+								if(notification.type == "single_follow" && notification.seen == "no") {
+									++total;
+									docs[0].notifications.splice(docs[0].notifications.indexOf(notification), 1);
+								}
+							});
 
-							console.log("Success in following")
-							res.json({ message: "Followed successfully"});
-						}
-					});
+							if(total > 0) {
+								followNotify.details = docs[0].name + " and " + total + " others are now following You.";
+								followNotify.type = "multi_follow";
+							} else {
+								followNotify.details = docs[0].name + " is now following You.";
+								followNotify.type = "single_follow";
+							}
+
+							followNotify.pic = docs[0].pic;
+							followNotify.option = "no";
+							followNotify.seen = "no";	
+
+							followNotify.save(function(err) {
+								if(err) {
+									console.log(err);
+									res.send(err);
+								} else {
+									docs[0].notifications.unshift(followNotify._id);
+									docs[0].save(function(err) {
+										console.log("Success in following");
+										
+										var message = {
+														    to: docs[0].gcm_token, // required
+														    notification: {
+														        title: 'Someone followed You',
+														        body: followNotify.details,
+														        click_action: 'OPEN_ACTIVITY_1'
+														    }
+														};
+
+														fcm.send(message, function(err, response){
+														    if (err) {
+														        console.log("Something has gone wrong!");
+														         console.log(err);
+														        res.send(err);
+														       
+														    } else {
+														        console.log("Successfully sent with response: ", response);
+																res.json("followed");
+														    }
+														});
+									});			
+								}
+
+							});
+								}
+							});
+
+					
 				  });
 				}
 			});
@@ -322,7 +409,7 @@ module.exports = function(app) {
 				console.log("Error while creating venue" + err);
 				res.send(err);
 			} else {
-				console.log("created venue"+ artist);
+				console.log("created venue"+ venue);
 				res.json(venue._id);
 			}
 		});
@@ -671,30 +758,6 @@ module.exports = function(app) {
 		});
 	});
 
-	app.post("/book", function(req, res) {
-		/// code to book
-
-		var booking = new Booking(req.body);
-		booking.save(function(err) {
-			if(err) {
-				console.log(err);
-				res.send(err);
-			} else {
-				console.log("booked");
-				res.json("booked");
-			}
-		});
-	});
-
-	app.get("/details/bookings", function(req, res) {
-		/// code to retrieve booking details of single user
-		if(req.query.type == "venue") {
-
-		} else {
-			
-		}
-	});
-
 	app.get("/chat_details", function(req, res) {										// getting chat details of
 		var con = {};																	//number of users chatted with
 		var cons = [];
@@ -909,6 +972,950 @@ module.exports = function(app) {
 			} else {
 				console.log(user);
 				res.send("upated");
+			}
+		});
+	});
+
+	app.get("/followers", function(req, res) {
+
+		var follower = {};
+		var followers = [];
+
+		User.find({ _id: req.query.cur_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				var x = docs[0].followers.length;
+
+				docs[0].followers.forEach(function(doc) {
+					User.find({ _id: doc }, function(err, users) {
+						if(err) {
+							console.log(err);
+							res.send(err);
+						} else {
+							follower.id = doc;
+							follower.name = users[0].name;
+							follower.type = users[0].type;
+							if(users[0].__t == "Artist" || users[0].__t == "Band") 
+								follower.genre = users[0].genre;
+							else
+								follower.genre = "";
+							follower.pic = users[0].pic;
+
+							followers.push(follower);
+						}
+
+						if(x == 1) {
+							console.log(followers);
+							res.json(followers);
+						} else {
+							--x
+						}
+					});
+				});
+			}
+		});
+	});
+
+	app.get("/following", function(req, res) {
+
+		var following = {};
+		var followings = [];
+
+		User.find({ _id: req.query.cur_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				var x = docs[0].following.length;
+
+				docs[0].following.forEach(function(doc) {
+					User.find({ _id: doc }, function(err, users) {
+						if(err) {
+							console.log(err);
+							res.send(err);
+						} else {
+							following.id = doc;
+							following.name = users[0].name;
+							following.type = users[0].type;
+							if(users[0].__t == "Artist" || users[0].__t == "band") 
+								following.genre = users[0].genre;
+							else
+								following.genre = "";
+							following.pic = users[0].pic;
+
+							followings.push(following);
+						}
+
+						if(x == 1) {
+							console.log(followings);
+							res.json(followings);
+						} else {
+							--x
+						}
+					});
+				});
+			}
+		});
+	});
+
+	app.post("/book/artist", function(req, res) {
+		var booking = new Booking();
+		var bookingNotify = new Notification();
+
+		Artist.find({ _id: req.query.artist_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				booking.type = docs[0].type;
+				booking.booked_id = docs[0]._id;
+				booking.booked = doc[0].name;
+				booking.bookedBy_id = req.query.venue_id;
+				booking.time = req.query.time;
+				booking.day = req.query.day;
+				booking.status = "sent";
+
+				Venue.find({ _id: req.query.venue_id }, function(err, venues) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						console.log("booked");
+						booking.bookedBy = venues[0].name;
+						booking.save(function(err) {
+							if(err) {
+								console.log(err);
+								res.send(err);
+							} else {
+								bookingNotify.details = venues[0].name  + " have invited you to perform on " + 
+																	booking.date + " at " + bookingtime;
+								bookingNotify.pic = venues[0].pic;
+								bookingNotify.option = "yes";
+								bookingNotify.seen = "no";
+								bookingNotify.type = "booking";
+								bookingNotify.attached_id = booking._id;
+
+								bookingNotify.save(function(err) {
+									if(err) {
+										console.log(err);
+										res.send(err)
+									} else {
+										console.log(booking);
+
+										docs[0].notifications.unshift(bookingNotify._id);
+										docs[0].save(function(err) {
+											if(err) {
+												console.log(err);
+												res.send(err);
+											} else {
+												console.log("booked");
+												var message = {
+												    to: docs[0].gcm_token, // required
+												    notification: {
+												        title: 'New Booking',
+												        body: bookingNotify.details
+												    }
+												};
+
+												fcm.send(message, function(err, response){
+												    if (err) {
+												        console.log("Something has gone wrong!");
+												    } else {
+												        console.log("Successfully sent with response: ", response);
+														res.json("sent");
+												    }
+												});
+											}
+										});
+									}
+								});
+							}
+						});
+					}
+				});
+			}
+		});
+	});
+
+	app.post("/book/band", function(req, res) {
+		var booking = new Booking();
+		var bookingNotify = new Notification();
+
+		booking.booked_id = req.query.band_id;
+		booking.bookedBy_id = req.query.venue_id;
+		booking.type = "Band";
+		booking.date = req.query.date;
+		booking.time = req.query.time;
+		booking.status = "sent";
+
+		Band.find({ _id: req.query.band_id }, function(err, bands) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				booking.booked = bands[0].name;
+				Venue.find({ _id: req.query.venue_id }, function(err, venues) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+							booking.bookedBy = venues[0].name;
+							booking.save(function(err) {
+							bookingNotify.details = venues[0].name + " have invited your band to perform on " 
+														+ booking.date + " at " + booking.time;
+							bookingNotify.pic = venues[0].pic;
+							bookingNotify.seen = "no";
+							bookingNotify.option = "yes";
+							bookingNotify.type = "booking";
+							bookingNotify.attached_id = booking._id;
+
+							bookingNotify.save(function(err) {
+								if(err) {
+									console.log(err);
+									res.send(err);
+								} else {
+									bands[0].notifications.push(bookingNotify._id);
+									bands[0].save(function(err) {
+										if(err) {
+											console.log(err);
+											res.send(res);
+										} else {
+											console.log("booking sent");
+											res.send("sent");
+										}
+									});
+								}
+							});
+						});
+					}
+				});
+			}
+		});
+	});
+
+	app.get("/booking/details/artist", function(req, res) {
+		var bookings = [];
+
+		Booking.find({ booked_id: req.query.id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				Array.prototype.push.apply(bookings, docs);
+				Artist.find({ _id: req.query.id }, function(err, users) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						var x = users[0].bands.length;
+
+						users[0].bands.forEach(function(band) {
+							Booking.find({ booked: band }, function(err, all) {
+								if(err) {
+									console.log(err);
+									re.send(err);
+								} else {
+									Array.prototype.push.apply(bookings, all);
+								}
+
+								if(x == 1) {
+									console.log(bookings);
+									res.json(bookings);
+								} else 
+									--x;
+							});
+						});
+					}
+				});
+			}
+		});
+	});
+
+	app.get("/booking/details/venue", function(req, res) {
+		var bookings = [];
+
+		Booking.find({ bookedBy_id: req.query.id }, function(err, docs) {
+			if(err) {
+
+				console.log(err);
+				res.send(err);
+			} else {
+				Array.prototype.push.apply(bookings, docs);
+				console.log(bookings);
+				res.json(bookings);
+			}
+		});
+	});
+
+	app.post("/jam/send", function(req, res) {
+		var jammingNotify = new Notification();
+		var jammming = new Jamming();
+
+		Artist.find({ _id: req.query.sender_id }, function(err, docs) {
+			jamming.sender_id = docs[0]._id;
+			jamming.sender  = docs[0].name;
+			jamming.date = req.query.date;
+			jamming.time = req.query.time;
+
+			Artist.find({ _id: req.query.sent_to_id }, function(err, artists) {
+				if(err) {
+					console.log(err);
+					res.send(err);
+				} else {
+					jamming.sent_to_id = artists[0]._id;
+					jamming.sent_to = artists[0].name;
+					
+					jamming.save(function(err) {
+						if(err) {
+							console.log(err);
+							res.send(err);
+						} else {
+							jammingNotify.details = jamming.sender + " has asked to jam with him on " + jamming.day + " at "
+							 																+ jamming.time;
+							jammingNotify.pic = docs[0].pic;
+							jammingNotify.option = "yes"; 
+							jammingNotify.type = "jamming";
+							jammingNotify.seen = "no";
+							jammingNotify._id = jamming._id;
+
+							jammingNotify.save(function(err) {
+								if(err) {
+									console.log(err);
+									res.send(err);
+								} else {
+									artists[0].notifications.unshift(jammingNotify._id);
+									artists[0].save(function(err) {
+										if(err) {
+											console.log(err);
+											res.send(err);
+										} else {
+											console.log("send notification for jammming");
+											
+											var message = {
+												    to: artists[0].gcm_token, // required
+												    notification: {
+												        title: 'New Jam request',
+												        body: jammingNotify.details,
+												        click_action: 'OPEN_ACTIVITY_1'
+												    }
+												};
+
+												fcm.send(message, function(err, response){
+												    if (err) {
+												        console.log("Something has gone wrong!");
+												    } else {
+												        console.log("Successfully sent with response: ", response);
+														res.json("sent");
+												    }
+												});
+										}
+									});
+								}
+							});
+						}
+					});
+				}
+			});
+		});
+	});
+
+	app.post("/jam/accepted", function(req, res) {
+
+		Notification.find({ _id: notify_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				Jamming.find({ _id: docs[0].attached_id }, function(err, jams) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						if(jams.length == 0) {
+							console.log("no_jams");
+							res.json("no_jam_found");
+						} else {
+							jams[0].status = "accepted";
+							jams[0].save(function(err) {
+								Artist.find({ _id: jams[0].sent_to_id }, function(err, artists) {
+									if(err) {
+										console.log(err);
+										res.send(err); 
+									} else {
+										artists[0].splice(artists[0].notifications.indexOf(docs[0]._id), 1);
+										artists.save(function(err) {
+											if(err) {
+												console.log(err);
+												res.send(err);
+											} else {
+												Artist.find({ _id: jams[0].sender_id }, function(err, result) {
+													if(err) {
+														console.log(err);
+														res.send(err);
+													} else {
+														var acceptNotify = new Notification();
+														acceptNotify.details = jams[0].sent_to + " have accepted your jamming requested.";
+														acceptNotify.pic = artists[0].pic;
+														acceptNotify.type = "jamming";
+														acceptNotify.option = "no";
+														acceptNotify.seen = "no";
+
+														acceptNotify.save(function(err) {
+															if(err) {
+																console.log(err);
+																res.send(err);
+															} else {
+																result[0].notifications.unshift(acceptNotify);
+																result[0].save(function(err) {
+																	if(err) {
+																		console.log(err);
+																		res.send(err);
+																	} else {
+																		console.log("accepted");
+																		
+																		var message = {
+																		    to: result[0].gcm_token, // required
+																		    notification: {
+																		        title: 'Jam request accepted',
+																		        body: acceptNotify.details,
+																		        click_action: 'OPEN_ACTIVITY_1'
+																		    }
+																		};
+
+																		fcm.send(message, function(err, response){
+																		    if (err) {
+																		        console.log("Something has gone wrong!");
+																		        res.send(err)
+																		    } else {
+																		        console.log("Successfully sent with response: ", response);
+																				res.json("jam_accepted");
+																		    }
+																		});
+																	}
+																});
+															}
+														});
+													}
+												});
+											}
+										});
+									}
+								});
+							});
+						}
+					}
+				});
+			}
+		});
+	});
+
+	app.post("/jam/rejected", function(req, res) {
+
+			Notification.find({ _id: req.query.notify_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				Jamming.find({ _id: docs[0].attached_id }, function(err, jams) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						if(jams.length == 0) {
+							console.log("no_jams");
+							res.json("no_jam_found");
+						} else {
+								Artist.find({ _id: jams[0].sent_to_id }, function(err, artists) {
+									if(err) {
+										console.log(err);
+										res.send(err); 
+									} else {
+										artists[0].splice(artists[0].notifications.indexOf(docs[0]._id), 1);
+										artists.save(function(err) {
+											if(err) {
+												console.log(err);
+												res.send(err);
+											} else {
+												Artist.find({ _id: jams[0].sender_id }, function(err, result) {
+													if(err) {
+														console.log(err);
+														res.send(err);
+													} else {
+														var rejectNotify = new Notification();
+														rejectNotify.details = jams[0].sent_to + " could not jam with you.";
+														rejectNotify.pic = artists[0].pic;
+														rejectNotify.type = "jamming";
+														rejectNotify.option = "no";
+														rejectNotify.seen = "no";
+
+														rejectNotify.save(function(err) {
+															if(err) {
+																console.log(err);
+																res.send(err);
+															} else {
+																result[0].notifications.unshift(rejectNotify);
+																result[0].save(function(err) {
+																	if(err) {
+																		console.log(err);
+																		res.send(err);
+																	} else {
+																		console.log("rejected");
+																		jams[0].remove(function(err) {
+																			if(err) {
+																				console.log(err);
+																				res.send(err);
+																			} else {
+																				console.log("removed_jam");
+																				var message = {
+																				    to: result[0].gcm_token, // required
+																				    notification: {
+																				        title: 'Jam request rejected',
+																				        body: rejectNotify.details,
+																				        click_action: 'OPEN_ACTIVITY_1'
+																				    }
+																				};
+
+																				fcm.send(message, function(err, response){
+																				    if (err) {
+																				        console.log("Something has gone wrong!");
+																				        res.send(err)
+																				    } else {
+																				        console.log("Successfully sent with response: ", response);
+																						res.json("jam_rejected");
+																				    }
+																				});
+																			}
+																		});
+																	}
+																});
+															}
+														});
+													}
+												});
+											}
+										});
+									}
+								});
+						}
+					}
+				});
+			}
+		});
+	});
+
+	app.post("/jam/cancel", function(req, res) {
+		Jamming.find({ sender_id: req.query.sender_id, sent_to_id: req.query.sent_to_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				Artist.find({ _id: req.query.sent_to_id }, function(err, artists) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						var cancelNotfiy = new Notification();
+						cancelNotfiy.details = docs[0].sender + " have canceled the jam on " + docs[0].date + " at " + docs[0].time;
+						Artist.find({_id: req.query.sender_id}, function(err, result) {
+							if(err) {
+								console.log(err);
+								res.send(err);
+							} else {
+								cancelNotfiy.pic = result[0].pic;
+								cancelNotfiy.type = "jamming";
+								cancelNotfiy.option = "no";
+								cancelNotfiy.seen = "no";
+
+								cancelNotfiy.save(function(err) {
+									if(err) {
+										console.log(err);
+										res.send(err);
+									} else {
+										docs[0].remove(function(err) {
+											if(err) {
+												console.log(err);
+												res.json(err);
+											} else {
+												var message = {
+												    to: artists[0].gcm_token, // required
+												    notification: {
+												        title: 'Jam request canceled',
+												        body: cancelNotfiy.details,
+												        click_action: 'OPEN_ACTIVITY_1'
+												    }
+												};
+
+												fcm.send(message, function(err, response){
+												    if (err) {
+												        console.log("Something has gone wrong!");
+												        res.send(err)
+												    } else {
+												        console.log("Successfully sent with response: ", response);
+														res.json("jam_cancel");
+												    }
+												});
+											}
+										});
+									}
+								});
+							}
+						});
+					}
+				});
+			}
+		});
+	});
+
+		app.post("/booking/accepted", function(req, res) {
+
+		Notification.find({ _id: req.query.notify_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				Booking.find({ _id: docs[0].attached_id }, function(err, books) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						if(books.length == 0) {
+							console.log("no_books");
+							res.json("no_booking_found");
+						} else {
+							books[0].status = "accepted";
+							books[0].save(function(err) {
+								Artist.find({ _id: books[0].sent_to_id }, function(err, artists) {
+									if(err) {
+										console.log(err);
+										res.send(err); 
+									} else {
+										artists[0].splice(artists[0].notifications.indexOf(docs[0]._id), 1);
+										artists.save(function(err) {
+											if(err) {
+												console.log(err);
+												res.send(err);
+											} else {
+												Artist.find({ _id: books[0].bookedBy_id }, function(err, result) {
+													if(err) {
+														console.log(err);
+														res.send(err);
+													} else {
+														var acceptNotify = new Notification();
+														acceptNotify.details = books[0].booked + " has been booked " + " on " + books[0].date + " at " + books[0].time;
+														acceptNotify.pic = artists[0].pic;
+														acceptNotify.type = "booking";
+														acceptNotify.option = "no";
+														acceptNotify.seen = "no";
+
+														acceptNotify.save(function(err) {
+															if(err) {
+																console.log(err);
+																res.send(err);
+															} else {
+																result[0].notifications.unshift(acceptNotify);
+																result[0].save(function(err) {
+																	if(err) {
+																		console.log(err);
+																		res.send(err);
+																	} else {
+																		console.log("accepted");
+																		var message = {
+																		    to: result[0].gcm_token, // required
+																		    notification: {
+																		        title: 'Booking request accepted',
+																		        body: acceptNotify.details,
+																		        click_action: 'OPEN_ACTIVITY_1'
+																		    }
+																		};
+
+																		fcm.send(message, function(err, response){
+																		    if (err) {
+																		        console.log("Something has gone wrong!");
+																		        res.send(err)
+																		    } else {
+																		        console.log("Successfully sent with response: ", response);
+																				res.json("booking_accepted");
+																		    }
+																		});
+																	}
+																});
+															}
+														});
+													}
+												});
+											}
+										});
+									}
+								});
+							});
+						}
+					}
+				});
+			}
+		});
+	});
+
+	app.post("/booking/rejected", function(req, res) {
+
+			Notification.find({ _id: req.query.notify_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				Booking.find({ _id: docs[0].attached_id }, function(err, books) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						if(books.length == 0) {
+							console.log("no_bookings");
+							res.json("no_booking_found");
+						} else {
+								Artist.find({ _id: books[0].booked_id }, function(err, artists) {
+									if(err) {
+										console.log(err);
+										res.send(err); 
+									} else {
+										artists[0].splice(artists[0].notifications.indexOf(docs[0]), 1);
+										artists.save(function(err) {
+											if(err) {
+												console.log(err);
+												res.send(err);
+											} else {
+												Artist.find({ _id: books[0].bookedBy_id }, function(err, result) {
+													if(err) {
+														console.log(err);
+														res.send(err);
+													} else {
+														var rejectNotify = new Notification();
+														rejectNotify.details = books[0].booked + " could not perform here.";
+														rejectNotify.pic = artists[0].pic;
+														rejectNotify.type = "booking";
+														rejectNotify.option = "no";
+														rejectNotify.seen = "no";
+
+														rejectNotify.save(function(err) {
+															if(err) {
+																console.log(err);
+																res.send(err);
+															} else {
+																result[0].notifications.unshift(rejectNotify);
+																result[0].save(function(err) {
+																	if(err) {
+																		console.log(err);
+																		res.send(err);
+																	} else {
+																		console.log("rejected");
+																		books[0].remove(function(err) {
+																			if(err) {
+																				console.log(err);
+																				res.send(err);
+																			} else {
+																				console.log("removed_jam");
+																				var message = {
+																				    to: result[0].gcm_token, // required
+																				    notification: {
+																				        title: 'Jam request rejected',
+																				        body: rejectNotify.details,
+																				        click_action: 'OPEN_ACTIVITY_1'
+																				    }
+																				};
+
+																				fcm.send(message, function(err, response){
+																				    if (err) {
+																				        console.log("Something has gone wrong!");
+																				        res.send(err)
+																				    } else {
+																				        console.log("Successfully sent with response: ", response);
+																						res.json("booking_rejected");
+																				    }
+																				});
+																				
+																			}
+																		});
+																	}
+																});
+															}
+														});
+													}
+												});
+											}
+										});
+									}
+								});
+						}
+					}
+				});
+			}
+		});
+	});
+
+	app.post("booking/cancel", function(req, res) {
+		booking.find({ booked_id: req.query.booked_id, bookedBy_id: req.query.bookedBy_id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				Artist.find({ _id: req.query.booked_id }, function(err, artists) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						var cancelNotfiy = new Notification();
+						cancelNotfiy.details = docs[0].bookedBy + " have canceled the booking request on " + docs[0].date + " at " + docs[0].time;
+						Artist.find({ _id: req.query.bookedBy_id }, function(err, result) {
+							if(err) {
+								console.log(err);
+								res.send(err);
+							} else {
+								cancelNotfiy.pic = result[0].pic;
+								cancelNotfiy.type = "booking";
+								cancelNotfiy.option = "no";
+								cancelNotfiy.seen = "no";
+
+								cancelNotfiy.save(function(err) {
+									if(err) {
+										console.log(err);
+										res.send(err);
+									} else {
+										docs[0].remove(function(err) {
+											if(err) {
+												console.log(err);
+												res.json(err);
+											} else {
+													var message = {
+													    to: artists[0].gcm_token, // required
+													    notification: {
+													        title: 'Booking request canceled',
+													        body: cancelNotfiy.details,
+													        click_action: 'OPEN_ACTIVITY_1'
+													    }
+													};
+
+													fcm.send(message, function(err, response){
+													    if (err) {
+													        console.log("Something has gone wrong!");
+													        res.send(err)
+													    } else {
+													        console.log("Successfully sent with response: ", response);
+															res.json("booking_cancel");
+													    }
+													});
+											}
+										});
+									}
+								});
+							}
+						});
+					}
+				});
+			}
+		});
+	});
+
+	app.post("/update/gcm", function(req, res) {
+		User.find({ _id: req.query.id }, function(err, users) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				users[0].gcm_token = req.query.gcm_token;
+				users[0].save(function(err) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						console.log("saved_gcm");
+						res.json("updated_gcm");
+					}
+				});
+			}
+		});
+	});
+
+	app.get("/bookedOrNot", function(req, res) {
+		Booking.find({ bookedBy_id: req.query.cur_id , booked_id: req.query.id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				if(docs.length == 0) {
+					console.log("no booking");
+					res.json("Book");
+				} else {
+					if(docs[0].status == "sent") {
+						console.log("cancel");
+						res.json("Cancel");
+					} else if(docs[0].status == "accepted") {
+						console.log("Booked");
+						res.json("Booked");
+					}
+				}
+			}
+		});
+	});
+
+	app.get("/jammingOrNot", function(req, res) {
+		Jamming.find({ sender_id: req.query.cur_id, sent_to_id: req.query.id }, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				if(docs.length == 0) {
+					console.log("no jamming");
+					res.json("Jam");
+				} else {
+					if(docs[0].status == "sent") {
+						console.log("cancel");
+						res.json("Cancel");
+					} else if(docs[0].status == "accepted") {
+						console.log("jamming");
+						res.json("Jamming");
+					}
+				}
+			}
+		});
+	});
+
+	app.get("/notifications", function(req, res) {
+		var notifications = [];
+
+		User.find({ _id: req.query.id}, function(err, docs) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				var x = docs[0].notifications.length;
+				if(x == 0) {
+					console.log(x);
+					res.send(notifications);
+				} else {
+						docs[0].notifications.forEach(function(id) {
+							Notification.find({ _id: id }, function(err, notification) {
+								if(err) {
+									console.log(err);
+									res,send(err);
+								} else {
+										notification[0].seen = "yes";
+										notification[0].save(function(err) {
+											if(err) {
+												console.log(err);
+												res.send(err);
+											} else {
+												notifications.push(notification[0]);
+												if(x == 1) {
+													console.log(notification[0]);
+													res.send(notifications);
+												} else 
+													--x;
+											}
+										});
+									}
+							});
+						});
+					}
 			}
 		});
 	});
