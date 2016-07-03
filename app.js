@@ -4,7 +4,7 @@ var connect = require('connect');
 var app = express();
 var mongoose = require('mongoose');
 
-mongoose.connect('mongodb://pro:pro@ds023634.mlab.com:23634/euphony');
+mongoose.connect('mongodb://pro:pro_123@ds011705.mlab.com:11705/euphony');
 console.log("Connected to db");
 
 var port = process.env.PORT || 8080;
