@@ -8,5 +8,8 @@
 		"connect": "~2.14.4",
 		"socket.io": "*",
 		"fcm-push": "*"
+	},
+	"scripts": {
+		"start": "node app.js"
 	}
 }
