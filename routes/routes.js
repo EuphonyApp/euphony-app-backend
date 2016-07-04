@@ -1824,16 +1824,20 @@ module.exports = function(app) {
 				console.log(err);
 				res.send(err);
 			} else {
-				users[0].gcm_token = req.query.gcm_token;
-				users[0].save(function(err) {
-					if(err) {
-						console.log(err);
-						res.send(err);
-					} else {
-						console.log("saved_gcm");
-						res.json("updated_gcm");
-					}
-				});
+				if(users.length != 0) {
+					users[0].gcm_token = req.query.gcm_token;
+					users[0].save(function(err) {
+						if(err) {
+							console.log(err);
+							res.send(err);
+						} else {
+							console.log("saved_gcm");
+							res.json("updated_gcm");
+						}
+					});
+				} else {
+					res.json("updated_gcm");
+				}
 			}
 		});
 	});
