@@ -358,7 +358,10 @@ module.exports = function(app) {
 				console.log("created " + artist);
 
 				var location = new Location();
+				
 				location.user_id = artist._id;
+				location.track = "yes";
+				location.coords = [];
 
 				location.save(function(err) {
 					if(err) {
