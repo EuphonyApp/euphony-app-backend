@@ -51,7 +51,13 @@ var BandSchema = new UserSchema({
 	members: [String], 
 	genre: String, 
 	utube: String, 
-	scloud: String                  // add details
+	scloud: String,
+	manager: String,
+	manager_id: String,
+	location: String,
+	contact: String,
+	subgenre: [String],
+	positions: []																// add details
 });
 
 var LocationSchema = new Schema({
@@ -358,7 +364,6 @@ module.exports = function(app) {
 				console.log("created " + artist);
 
 				var location = new Location();
-				
 				location.user_id = artist._id;
 				location.track = "yes";
 				location.coords = [];
@@ -518,8 +523,8 @@ module.exports = function(app) {
 
 	app.get('/band/list', function(req, res) {													// get the lists of bands for one artist
 																								// params "cur_id" of the artist
-		var user = {};
-		var users = [];
+		var band = {};
+		var bands = [];
 		var ids = [];
 
 		User.find({ _id : req.query.cur_id }, function(err, artist) {
@@ -529,48 +534,31 @@ module.exports = function(app) {
 				res.send(err);
 			}
 			else {
-				ids = artist[0].bands;
-				var x = ids.length;
-
-				console.log(ids);
+				var x = artists[0].bands;
 
 				if(x == 0) {
-					console.log(users.length);
-					res.json(users);
-				}
+					console.log(bands.length);
+					res.json(bands);
+				} else {
+					artists[0].bands.forEach(function(band) {
+						Band.find({ _id: band }, function(err, my_bands) {
+							if(err) {
+								console.log(err);
+								res.send(err);
+							} else {
+								bands.push(bands[0]);
+							}
 
-				ids.forEach(function(id) {
-
-					Band.find({ _id: id }, function(err, doc) {
-						if(err)
-							res.send(err);
-						else {
-
-						user._id = doc[0]._id;
-						user.name = doc[0].name;
-						user.type = doc[0].type;
-						user.pic = doc[0].pic;
-						user.location = doc[0].location;
-						user.members = doc[0].members.length;
-						user.no_followers = doc[0].followers.length;
-
-						if(doc[0].followers.indexOf(req.query.cur_id) > -1)
-							user.followOrnot = "yes";
-						else
-							user.followOrnot = "no";
-
-						users.push(user);
-						if(x == 1) {
-							console.log(users);
-							res.json(users);
-						}
-					    else
-							 --x;
-					}
+							if(x == 1) {
+								console.log(bands);
+								res.json(bands);
+							} else 
+								--x;
+						});
 					});
-				});
+				}
 			}
-	});
+		});
 	});
 
 	app.get("/band/add/artist", function(req, res) {											//cadd artist to band
@@ -628,9 +616,9 @@ module.exports = function(app) {
 						docs.forEach(function(doc) {
 							user._id = doc._id;
 					        user.name = doc.name;
-					        user.type = doc.genre;
+					        user.type = "artist";
 					        user.pic = doc.pic;
-					        user.followOrno = "no";
+					        user.genre = doc.genre;
 
 					        users.push(user);
 					        if( x == 1) {
@@ -975,6 +963,40 @@ module.exports = function(app) {
 			} else {
 				console.log(user);
 				res.send("upated");
+			}
+		});
+	});
+
+	app.post('/update/band', function(req, res) {
+		Band.findByIdAndUpdate(req.body._id, req.body, {new: true}, function(err, user) {
+			if(err) {
+				console.log(err);
+				res.json(err);
+			} else {
+				var x = doc.members.length;
+				doc.members.forEach(function(member) {
+					Artist.find({_id: member}, function(err, docs) {
+						if(err) {
+							console.log(err);
+							res.json(err);
+						} else {
+							if(docs[0].bands.indexOf(user._id) == -1) {
+								docs[0].bands.push(user._id);
+								docs[0].save(function(err) {
+									if(err) {
+										console.log(err);
+										res.json(err);
+									}
+								});
+							} 
+						}
+						if(x == 1) {
+							console.log("updated");
+							res.json("updated");
+						} else
+							--x;
+					});
+				});
 			}
 		});
 	});
@@ -1824,20 +1846,16 @@ module.exports = function(app) {
 				console.log(err);
 				res.send(err);
 			} else {
-				if(users.length != 0) {
-					users[0].gcm_token = req.query.gcm_token;
-					users[0].save(function(err) {
-						if(err) {
-							console.log(err);
-							res.send(err);
-						} else {
-							console.log("saved_gcm");
-							res.json("updated_gcm");
-						}
-					});
-				} else {
-					res.json("updated_gcm");
-				}
+				users[0].gcm_token = req.query.gcm_token;
+				users[0].save(function(err) {
+					if(err) {
+						console.log(err);
+						res.send(err);
+					} else {
+						console.log("saved_gcm");
+						res.json("updated_gcm");
+					}
+				});
 			}
 		});
 	});
@@ -1923,6 +1941,35 @@ module.exports = function(app) {
 							});
 						});
 					}
+			}
+		});
+	});
+
+	app.get("/band/members", function(req, res){
+		var artists = [];
+
+		Band.find({_id: req.query.id}, function(err, bands) {
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				var x = bands[0].members.length;
+				bands[0].members.forEach(function(member) {
+					Artist.find({_id: member}, function(er, artist) {
+						if(err) {
+							console.log(err);
+							res.send(err);
+						} else {
+							artists.push(artist[0]);
+						}
+
+						if(x = 1) {
+							console.log(artists);
+							res.json(artists);
+						} else
+							--x;
+					});
+				});
 			}
 		});
 	});
