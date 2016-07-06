@@ -4,6 +4,7 @@ var Schema = mongoose.Schema;
 var Conversation = require('../models/conversation.js'); 
 var FCM = require('fcm-push');
 var fs = require('fs');
+var geolib = require('geolib');
 
 var serverKey = 'AIzaSyCrSeEQvwb8p3JDfu8zrEGndextsD0mHu8';
 var fcm = new FCM(serverKey);
@@ -742,7 +743,7 @@ module.exports = function(app) {
 
 	app.get("/nearby", function(req, res) {
 
-		var maxDistance = 30;                               ///max distance to search users from 
+		var maxDistance = 80;                               ///max distance to search users from 
 		maxDistance /= 6371; 
 
 		var artists = [];                              /// divided by earth radius
@@ -751,14 +752,68 @@ module.exports = function(app) {
 		coords[0] = req.query.longitude;                    // params are lat and long of current user
 		coords[1] = req.query.latitude;
 
-		Location.find({ coords : { $near: coords, $maxDistance: maxDistance}}).limit(10).exec(function(err, locations) {						//get the ids of nearby users
+		Location.find({ coords : { $near: coords, $maxDistance: maxDistance}}).limit(50).exec(function(err, locations) {						//get the ids of nearby users
 																																			//limiting retieved user numbers to 10, can be changed
 			if(err) {
 				console.log(err);
 				res.send(err);
 			} else {
 				console.log("found" + locations.length + "locations nearby");
-				res.send(locations);
+				var length = locations.length;
+				if(length != 0) {
+					locations.forEach(function(location) {
+						Artist.find({_id: location.user_id}, function(err, docs) {
+							if(err) {
+								console.log(err);
+								res.json(err);
+							} else {
+								if(docs.length != 0) {
+									var dis = geolib.getDistance({latitude: coords[1], longitude: coords[0]}, {latitude:location.coords[1], longitude: location.coords[0]});
+									docs[0].dis = dis;
+									artists.push(docs[0]); 
+								}
+							}
+
+							if(length == 1) {
+								console.log(artists);
+								res.json(artists) 
+							} else 
+								--length;
+						});
+					});
+				} else {
+					console.log("no locations");
+					res.json(artists);
+				}
+			}
+		});
+	});
+
+	app.get("/unread", function(req, res) {										// getting chat details of
+		var unread = 0;		
+		
+		console.log("id"+ req.query.id);
+
+		Conversation.find({}, function(err, docs) {
+			if(docs.length != 0) {
+
+				var z = docs.length;
+
+				docs.forEach(function(doc) {		
+					if(doc.messages.length != 0) {
+						doc.messages.forEach(function(err, message) {
+							if(message.read == "no") 
+								++unread;
+						});
+					}
+					if(z == 1) {
+						console.log(unread);
+						res.json(unread);
+					}
+				});
+			} else {
+				console.log("0");
+				res.json(unread);
 			}
 		});
 	});
@@ -1203,31 +1258,53 @@ module.exports = function(app) {
 					} else {
 							booking.bookedBy = venues[0].name;
 							booking.save(function(err) {
-							bookingNotify.details = venues[0].name + " have invited your band to perform on " 
-														+ booking.date + " at " + booking.time;
-							bookingNotify.pic = venues[0].pic;
-							bookingNotify.seen = "no";
-							bookingNotify.option = "yes";
-							bookingNotify.type = "booking";
-							bookingNotify.attached_id = booking._id;
+								bookingNotify.details = venues[0].name + " have invited your band" + bands[0].name + "to perform on " 
+															+ booking.date + " at " + booking.time;
+								bookingNotify.pic = venues[0].pic;
+								bookingNotify.seen = "no";
+								bookingNotify.option = "yes";
+								bookingNotify.type = "booking";
+								bookingNotify.attached_id = booking._id;
 
-							bookingNotify.save(function(err) {
-								if(err) {
-									console.log(err);
-									res.send(err);
-								} else {
-									bands[0].notifications.push(bookingNotify._id);
-									bands[0].save(function(err) {
-										if(err) {
-											console.log(err);
-											res.send(res);
-										} else {
-											console.log("booking sent");
-											res.send("sent");
-										}
-									});
-								}
-							});
+								bookingNotify.save(function(err) {
+									if(err) {
+										console.log(err);
+										res.send(err);
+									} else {
+										Artist({ _id: bands[0].manager_id }, function(err, manager) {
+											if(err) {
+												console.log(err);
+												res.send(err); 
+											} else {
+												manager[0].notifications.unshift(bookingNotify._id);
+												manager[0].save(function(err) {
+													if(err) {
+														console.log(err);
+														res.send(res);
+													} else {
+														console.log("booking sent");
+														var message = {
+														    to: manager[0].gcm_token, // required
+														    notification: {
+														        title: 'New Booking',
+														        body: bookingNotify.details
+														    }
+														};
+
+														fcm.send(message, function(err, response){
+														    if (err) {
+														        console.log("Something has gone wrong!");
+														    } else {
+														        console.log("Successfully sent with response: ", response);
+																res.json("sent");
+														    }
+														});
+													}
+												});
+											}
+										});
+									}
+								});
 						});
 					}
 				});
@@ -1626,7 +1703,22 @@ module.exports = function(app) {
 						} else {
 							books[0].status = "accepted";
 							books[0].save(function(err) {
-								Artist.find({ _id: books[0].sent_to_id }, function(err, artists) {
+								var search_id;
+
+								if(books[0].type != "Bands")
+									search_id = books[0].booked_id;
+								else {
+									Band.find({ _id: books[0].booked_id }, function(err, band) {
+										if(err) {
+											console.log(err);
+											res.send(err); 
+										} else {
+											search_id = band[0].manager_id;
+										}
+									});
+								}
+
+								Artist.find({ _id: search_id }, function(err, artists) {
 									if(err) {
 										console.log(err);
 										res.send(err); 
@@ -1637,14 +1729,14 @@ module.exports = function(app) {
 												console.log(err);
 												res.send(err);
 											} else {
-												Artist.find({ _id: books[0].bookedBy_id }, function(err, result) {
+												Venue.find({ _id: books[0].bookedBy_id }, function(err, result) {
 													if(err) {
 														console.log(err);
 														res.send(err);
 													} else {
 														var acceptNotify = new Notification();
 														acceptNotify.details = books[0].booked + " has been booked " + " on " + books[0].date + " at " + books[0].time;
-														acceptNotify.pic = artists[0].pic;
+														acceptNotify.pic = docs[0].pic;
 														acceptNotify.type = "booking";
 														acceptNotify.option = "no";
 														acceptNotify.seen = "no";
@@ -1713,7 +1805,23 @@ module.exports = function(app) {
 							console.log("no_bookings");
 							res.json("no_booking_found");
 						} else {
-								Artist.find({ _id: books[0].booked_id }, function(err, artists) {
+
+								var search_id;
+
+								if(books[0].type != "Bands")
+									search_id = books[0].booked_id;
+								else {
+									Band.find({ _id: books[0].booked_id }, function(err, band) {
+										if(err) {
+											console.log(err);
+											res.send(err); 
+										} else {
+											search_id = band[0].manager_id;
+										}
+									});
+								}
+
+								Artist.find({ _id: search_id }, function(err, artists) {
 									if(err) {
 										console.log(err);
 										res.send(err); 
@@ -1724,14 +1832,14 @@ module.exports = function(app) {
 												console.log(err);
 												res.send(err);
 											} else {
-												Artist.find({ _id: books[0].bookedBy_id }, function(err, result) {
+												Venue.find({ _id: books[0].bookedBy_id }, function(err, result) {
 													if(err) {
 														console.log(err);
 														res.send(err);
 													} else {
 														var rejectNotify = new Notification();
 														rejectNotify.details = books[0].booked + " could not perform here.";
-														rejectNotify.pic = artists[0].pic;
+														rejectNotify.pic = docs[0].pic;
 														rejectNotify.type = "booking";
 														rejectNotify.option = "no";
 														rejectNotify.seen = "no";
@@ -1741,7 +1849,7 @@ module.exports = function(app) {
 																console.log(err);
 																res.send(err);
 															} else {
-																result[0].notifications.unshift(rejectNotify);
+																result[0].notifications.unshift(rejectNotify._id);
 																result[0].save(function(err) {
 																	if(err) {
 																		console.log(err);
@@ -1798,14 +1906,30 @@ module.exports = function(app) {
 				console.log(err);
 				res.send(err);
 			} else {
-				Artist.find({ _id: req.query.booked_id }, function(err, artists) {
+				var search_id;
+
+				if(docs[0].type != "Bands")
+					search_id = docs[0].booked_id;
+				else {
+					Band.find({ _id: docs[0].booked_id }, function(err, band) {
+						if(err) {
+							console.log(err);
+							res.send(err); 
+						} else {
+							search_id = band[0].manager_id;
+						}
+					});
+				}
+
+				Artist.find({ _id: search_id }, function(err, artists) {
 					if(err) {
 						console.log(err);
 						res.send(err);
 					} else {
 						var cancelNotfiy = new Notification();
 						cancelNotfiy.details = docs[0].bookedBy + " have canceled the booking request on " + docs[0].date + " at " + docs[0].time;
-						Artist.find({ _id: req.query.bookedBy_id }, function(err, result) {
+
+						Venue.find({ _id: req.query.bookedBy_id }, function(err, result) {
 							if(err) {
 								console.log(err);
 								res.send(err);
@@ -1825,6 +1949,7 @@ module.exports = function(app) {
 												console.log(err);
 												res.json(err);
 											} else {
+													artists[0].notifications.unshift(cancelNotfiy._id);
 													var message = {
 													    to: artists[0].gcm_token, // required
 													    notification: {
