@@ -547,7 +547,7 @@ module.exports = function(app) {
 				res.send(err);
 			}
 			else {
-				var x = artist[0].bands;
+				var x = artist[0].bands.length;
 
 				if(x == 0) {
 					console.log(bands.length);
@@ -2055,6 +2055,7 @@ module.exports = function(app) {
 				console.log(err);
 				res.send(err);
 			} else {
+				consolex
 				var x = docs[0].notifications.length;
 				if(x == 0) {
 					console.log(x);
@@ -2114,6 +2115,19 @@ module.exports = function(app) {
 							--x;
 					});
 				});
+			}
+		});
+	});
+
+	app.get("/bands/city", function(req, res){
+		Band.find({ location: req.query.city }, function(err, bands) {
+			console.log("calling");
+			if(err) {
+				console.log(err);
+				res.send(err);
+			} else {
+				console.log("got it");
+				res.json(bands);
 			}
 		});
 	});
