@@ -2055,7 +2055,7 @@ module.exports = function(app) {
 				console.log(err);
 				res.send(err);
 			} else {
-				consolex
+			
 				var x = docs[0].notifications.length;
 				if(x == 0) {
 					console.log(x);
