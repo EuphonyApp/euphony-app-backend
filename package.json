@@ -7,7 +7,8 @@
 		"mongoose": "~3.8.8",
 		"connect": "~2.14.4",
 		"socket.io": "*",
-		"fcm-push": "*"
+		"fcm-push": "*",
+		"geolib": "*"
 	},
 	"scripts": {
 		"start": "node app.js"
