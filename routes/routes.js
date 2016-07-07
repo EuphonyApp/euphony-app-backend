@@ -700,7 +700,7 @@ module.exports = function(app) {
 				console.log(err);
 				res.send(err);
 			} else {
-				console.log(docs[0]);
+			
 				if(docs[0].length != 0) {
 					docs[0].coords.push(req.query.longitude);
 					docs[0].coords.push(req.query.latitude);	
@@ -741,7 +741,7 @@ module.exports = function(app) {
 		});
 	});
 
-	app.get("/nearby", function(req, res) {
+	app.get("/artist/near", function(req, res) {
 
 		var maxDistance = 80;                               ///max distance to search users from 
 		maxDistance /= 6371; 
