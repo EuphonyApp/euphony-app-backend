@@ -37,7 +37,8 @@ var ArtistSchema = new UserSchema({
 	utube: String,
 	scloud: String,
 	bands: [String],
-	dis: String
+	dis: String,
+	gplus: String
 });
 
 var VenueSchema = new UserSchema({
@@ -56,7 +57,6 @@ var BandSchema = new UserSchema({
 	scloud: String,
 	manager: String,
 	manager_id: String,
-	location: String,
 	contact: String,
 	subgenre: [String],
 	positions: [String]																// add details
@@ -2055,7 +2055,7 @@ module.exports = function(app) {
 				console.log(err);
 				res.send(err);
 			} else {
-			
+
 				var x = docs[0].notifications.length;
 				if(x == 0) {
 					console.log(x);
