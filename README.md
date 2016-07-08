@@ -1,6 +1,6 @@
 # newServer
-Backend server for the new Android app I am working on, Euphony, which provides patform for arist to meetup up others with same or different genres, around their current locations and jam with other or form bands.
-Venues can signup using Social nmedia accounts and book performances, follow bands and artists.
+Backend server for the new Android app I am working on, Euphony, which provides patform for artists to meet others with same or different genres, around their current locations and jam together or form bands.
+Venues can signup using Social media accounts and book performances, follow bands and artists.
 
 Technology Stack Used-
 
