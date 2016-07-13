@@ -701,7 +701,7 @@ module.exports = function(app) {
 				res.send(err);
 			} else {
 			
-				if(docs[0].length != 0) {
+				if(docs.length != 0) {
 					docs[0].coords.push(req.query.longitude);
 					docs[0].coords.push(req.query.latitude);	
 					docs[0].track = "yes";										// params are lat, long and user_id
@@ -712,6 +712,23 @@ module.exports = function(app) {
 							res.send(err);
 						} else {
 							console.log(docs[0]);
+							res.send("updated");
+						}
+					});
+				} else {
+					
+					var loc = new Location();
+					loc.user_id = req.query.id;
+					loc.track = "yes";
+					loc.coords.push(req.query.longitude);
+					loc.coords.push(req.query.latitude);
+					
+					loc.save(function(err) {
+						if(err) {
+							console.log(err);
+							res.send(err);
+						} else {
+							console.log(loc));
 							res.send("updated");
 						}
 					});
