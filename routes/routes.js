@@ -1135,7 +1135,11 @@ module.exports = function(app) {
 				res.send(err);
 			} else {
 				var x = docs[0].followers.length;
-
+				
+				if(x == 0) {
+					res.json(followings);
+				}
+				
 				docs[0].followers.forEach(function(doc) {
 					User.find({ _id: doc }, function(err, users) {
 						if(err) {
@@ -1177,7 +1181,10 @@ module.exports = function(app) {
 				res.send(err);
 			} else {
 				var x = docs[0].following.length;
-
+				if(x == 0) {
+					res.json(followings);
+				}
+				
 				docs[0].following.forEach(function(doc) {
 					User.find({ _id: doc }, function(err, users) {
 						if(err) {
