@@ -1137,7 +1137,7 @@ module.exports = function(app) {
 				var x = docs[0].followers.length;
 				
 				if(x == 0) {
-					res.json(followings);
+					res.json(followers);
 				}
 				
 				docs[0].followers.forEach(function(doc) {
