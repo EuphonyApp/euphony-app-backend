@@ -453,6 +453,42 @@ module.exports = function(app) {
 		}
 		});
 	});
+	
+	app.get('/venue', function(req, res) {													//fetch an artist
+		Venue.find({ _id: req.query.id }, function(err, venues) {							//params "cur_id" of the artist 
+			if(err) {
+				console.log("error while sending venue");
+				res.end(err);
+			} else {
+				if(venues.length != 0) {
+				var venue = venues[0];
+				console.log("SEnt" + venue);
+				res.json(venue);
+			} else {
+				var a  = new Venue();
+				res.json(a);
+			}
+		}
+		});
+	});
+
+	app.get('/band', function(req, res) {													//fetch an artist
+		Band.find({ _id: req.query.id }, function(err, bands) {							//params "cur_id" of the artist 
+			if(err) {
+				console.log("error while sending bands");
+				res.end(err);
+			} else {
+				if(bands.length != 0) {
+				var band = bands[0];
+				console.log("SEnt" + band);
+				res.json(band);
+			} else {
+				var a  = new Band();
+				res.json(a);
+			}
+		}
+		});
+	});
 
 	app.post('/artists', function(req, res) {										//dummy funtion to add multiple users
 		var items = req.body;
