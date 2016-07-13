@@ -728,7 +728,7 @@ module.exports = function(app) {
 							console.log(err);
 							res.send(err);
 						} else {
-							console.log(loc));
+							console.log(loc);
 							res.send("updated");
 						}
 					});
