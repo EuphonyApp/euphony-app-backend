@@ -364,21 +364,7 @@ module.exports = function(app) {
 				res.end(err);
 			} else {
 				console.log("created " + artist);
-
-				var location = new Location();
-				location.user_id = artist._id;
-				location.track = "yes";
-				location.coords = [];
-
-				location.save(function(err) {
-					if(err) {
-						console.log(err);
-						res.send(err);
-					} else {
-						console.log("locatio created");
-						res.json(artist._id);
-					}
-				});
+				res.json(artist._id);
 			}
 		});
 	});
@@ -453,7 +439,7 @@ module.exports = function(app) {
 		}
 		});
 	});
-	
+
 	app.get('/venue', function(req, res) {													//fetch an artist
 		Venue.find({ _id: req.query.id }, function(err, venues) {							//params "cur_id" of the artist 
 			if(err) {
@@ -738,6 +724,8 @@ module.exports = function(app) {
 			} else {
 			
 				if(docs.length != 0) {
+					console.log(docs.length);
+
 					docs[0].coords.push(req.query.longitude);
 					docs[0].coords.push(req.query.latitude);	
 					docs[0].track = "yes";										// params are lat, long and user_id
@@ -952,7 +940,18 @@ module.exports = function(app) {
 				docs.forEach(function(doc) {
 					if(doc.users.indexOf(req.query.id) > -1 && doc.users.indexOf(req.query.cur_id) > -1) {
 						messages = doc.messages;
-						res.json(messages);
+						doc.messages.forEach(function(err, message) {
+									if(message.read == "no") {
+										message.read = "yes";
+										doc.save(function(err) {
+											if(err) 
+												res.send(err);
+											else {
+												res.json(messages);
+											}
+										});
+									}
+						});
 					}
 				});
 			}
@@ -1135,11 +1134,10 @@ module.exports = function(app) {
 				res.send(err);
 			} else {
 				var x = docs[0].followers.length;
-				
+
 				if(x == 0) {
 					res.json(followers);
 				}
-				
 				docs[0].followers.forEach(function(doc) {
 					User.find({ _id: doc }, function(err, users) {
 						if(err) {
@@ -1184,7 +1182,7 @@ module.exports = function(app) {
 				if(x == 0) {
 					res.json(followings);
 				}
-				
+
 				docs[0].following.forEach(function(doc) {
 					User.find({ _id: doc }, function(err, users) {
 						if(err) {
