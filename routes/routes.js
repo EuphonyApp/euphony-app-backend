@@ -226,6 +226,7 @@ module.exports = function(app) {
 				res.end(err);
 			}
 
+			if(docs[0].followers.indexOf(req.query.cur_user) <= -1) {
 			docs[0].followers.push(req.query.cur_user);
 			docs[0].save(function(err) {
 				if(err) {
@@ -238,6 +239,7 @@ module.exports = function(app) {
 						res.end(err);
 					}
 
+					if(users[0].following.indexOf(req.query.follow) <= -1) {
 					users[0].following.push(req.query.follow);
 					users[0].save(function(err) {
 						if(err) {
@@ -300,10 +302,11 @@ module.exports = function(app) {
 								}
 							});
 
-					
+					}
 				  });
 				}
 			});
+			 }
 		});
 	});
 
@@ -727,7 +730,7 @@ module.exports = function(app) {
 					console.log(docs.length);
 
 					docs[0].coords[0] = req.query.longitude;
-					docs[0].coords[0] = req.query.latitude;	
+					docs[0].coords[1] = req.query.latitude;	
 					docs[0].track = "yes";										// params are lat, long and user_id
 
 					docs[0].save(function(err) {
@@ -742,11 +745,14 @@ module.exports = function(app) {
 				} else {
 					
 					var loc = new Location();
+
 					loc.user_id = req.query.id;
 					loc.track = "yes";
-					loc.coords = [];
-					loc.coords.push(req.query.longitude);
-					loc.coords.push(req.query.latitude);
+
+					var coords = [];
+    				coords[0] = req.query.longitude;
+    				coords[1] = req.query.latitude;
+					loc.coords = coords;
 					
 					loc.save(function(err) {
 						if(err) {
@@ -808,18 +814,20 @@ module.exports = function(app) {
 							if(err) {
 								console.log(err);
 								res.json(err);
-							} else {
+							} else if(location.user_id != req.query.cur_id){
 								if(docs.length != 0) {
 									var dis = geolib.getDistance({latitude: coords[1], longitude: coords[0]}, {latitude:location.coords[1], longitude: location.coords[0]});
-									docs[0].dis = dis;
-									artists.push(docs[0]); 
+									docs[0].dis = dis + "km";
+									artists.push(docs[0]);
+
+									if(length == 1) {
+										console.log(artists);
+										res.json(artists) 
+									}
 								}
 							}
 
-							if(length == 1) {
-								console.log(artists);
-								res.json(artists) 
-							} else 
+							if(length != 1)
 								--length;
 						});
 					});
@@ -983,7 +991,7 @@ module.exports = function(app) {
 						}
 					});
 
-					var Conversation = new Conversation();
+					var conversation = new Conversation();
 					conversation.users.push(message.frm);
 					conversation.users.push(message.to);
 					conversation.messages.push(message);
@@ -997,7 +1005,7 @@ module.exports = function(app) {
 						}
 					});
 				} else {
-					var Conversation = new Conversation();
+					var conversation = new Conversation();
 					conversation.users.push(message.frm);
 					conversation.users.push(message.to);
 					conversation.messages.push(message);
