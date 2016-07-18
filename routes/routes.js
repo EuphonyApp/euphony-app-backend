@@ -726,8 +726,8 @@ module.exports = function(app) {
 				if(docs.length != 0) {
 					console.log(docs.length);
 
-					docs[0].coords.push(req.query.longitude);
-					docs[0].coords.push(req.query.latitude);	
+					docs[0].coords[0] = req.query.longitude;
+					docs[0].coords[0] = req.query.latitude;	
 					docs[0].track = "yes";										// params are lat, long and user_id
 
 					docs[0].save(function(err) {
@@ -744,6 +744,7 @@ module.exports = function(app) {
 					var loc = new Location();
 					loc.user_id = req.query.id;
 					loc.track = "yes";
+					loc.coords = [];
 					loc.coords.push(req.query.longitude);
 					loc.coords.push(req.query.latitude);
 					
