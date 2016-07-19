@@ -791,7 +791,7 @@ module.exports = function(app) {
 
 	app.get("/artist/near", function(req, res) {
 
-		var maxDistance = 80;                               ///max distance to search users from 
+		var maxDistance = 500;                               ///max distance to search users from 
 		maxDistance /= 6371; 
 
 		var artists = [];                              /// divided by earth radius
@@ -817,18 +817,21 @@ module.exports = function(app) {
 							} else if(location.user_id != req.query.cur_id){
 								if(docs.length != 0) {
 									var dis = geolib.getDistance({latitude: coords[1], longitude: coords[0]}, {latitude:location.coords[1], longitude: location.coords[0]});
-									docs[0].dis = dis + "km";
+									docs[0].dis = dis + "m";
 									artists.push(docs[0]);
 
 									if(length == 1) {
 										console.log(artists);
 										res.json(artists) 
-									}
+									} else
+										--length;
 								}
+							} else {
+								if(length != 1)
+									--length;
+								else
+									res.json(artists);
 							}
-
-							if(length != 1)
-								--length;
 						});
 					});
 				} else {
@@ -883,7 +886,9 @@ module.exports = function(app) {
 
 				docs.forEach(function(doc) {
 					unread = 0;
+					con.unread = 0;
 
+					console.log(doc);
 					if(doc.users.indexOf(req.query.id) == 1) 
 						con.id = doc.users[0];
 					else if(doc.users.indexOf(req.query.id) == 0)
@@ -894,13 +899,18 @@ module.exports = function(app) {
 							console.log("error fetching user");
 							res.send(err);
 						} else {
-							con.unread = unread;
-							con.pic = "";
-							con.name = "";						///users[0].name;
 
-							if(doc.messages.length != 0) {
-								doc.messages.forEach(function(err, message) {
-									if(message.read == "no") {
+							console.log(users[0]);
+							con.pic = users[0].pic;
+							con.name = users[0].name;						///users[0].name;
+
+							console.log("message" + doc.messages.length);
+							var x = doc.messages.length;
+
+							if(x != 0) {
+								doc.messages.forEach(function(message) {
+									console.log(message);
+									if(message.read == 'no') {
 										++unread;
 										message.read = "yes";
 
@@ -909,16 +919,26 @@ module.exports = function(app) {
 												res.send(err);
 											else {
 												con.unread = unread;
+												if(x == 1) {
+													cons.push(con);
+												}
+												else
+													--x;
 											}
 										});
+									} else {
+										if(x == 1) {
+											cons.push(con);
+									
+										}
+										else
+											--x;
 									}
 								});
 							}
 
-							console.log(con);
-							cons.push(con);
 							if(z == 1) {
-								console.log(cons[0]);
+								console.log(cons);
 								res.json(cons);
 							}
 							else
@@ -943,24 +963,16 @@ module.exports = function(app) {
 				res.send(err);
 			} else {
 				var x = docs.length;
+				console.log(x);
 				if(x == 0)
 					res.json(messages);
 
 				docs.forEach(function(doc) {
+					//console.log(doc);
 					if(doc.users.indexOf(req.query.id) > -1 && doc.users.indexOf(req.query.cur_id) > -1) {
 						messages = doc.messages;
-						doc.messages.forEach(function(err, message) {
-									if(message.read == "no") {
-										message.read = "yes";
-										doc.save(function(err) {
-											if(err) 
-												res.send(err);
-											else {
-												res.json(messages);
-											}
-										});
-									}
-						});
+						//console.log(messages);
+						res.json(messages);
 					}
 				});
 			}
@@ -970,6 +982,7 @@ module.exports = function(app) {
 	app.post("/message", function(req, res) {
 		var message = req.body;
 		message.read = req.query.read;
+		console.log(message);
 
 		Conversation.find({}, function(err, docs) {
 			if(err) {
@@ -977,6 +990,9 @@ module.exports = function(app) {
 				res.send(err);
 			} else {
 				if(docs.length != 0) {
+					console.log("docs length" + docs.length);
+
+					var x = docs.length;
 					docs.forEach(function(doc) {
 						if(doc.users.indexOf(message.frm) > -1 && doc.users.indexOf(message.to) > -1) {
 							doc.messages.push(message);
@@ -985,24 +1001,28 @@ module.exports = function(app) {
 									console.log(err);
 									res.send(err);
 								} else {
+									//console.log(doc);
 									res.json("saved");
 								}
 							});
-						}
-					});
+						} else {
+							if(x == 1) {
+								var conversation = new Conversation();
+								conversation.users.push(message.frm);
+								conversation.users.push(message.to);
+								conversation.messages.push(message);
 
-					var conversation = new Conversation();
-					conversation.users.push(message.frm);
-					conversation.users.push(message.to);
-					conversation.messages.push(message);
-
-					conversation.save(function(err) {
-						if(err)
-							res.send(err);
-						else {
-							console.log("saved");
-							res.json("saved");
-						}
+								conversation.save(function(err) {
+									if(err)
+										res.send(err);
+									else {
+										console.log("saved");
+										res.json("saved");
+									}
+								});
+							} else
+								--x;
+ 						}
 					});
 				} else {
 					var conversation = new Conversation();
@@ -1233,10 +1253,10 @@ module.exports = function(app) {
 			} else {
 				booking.type = docs[0].type;
 				booking.booked_id = docs[0]._id;
-				booking.booked = doc[0].name;
+				booking.booked = docs[0].name;
 				booking.bookedBy_id = req.query.venue_id;
 				booking.time = req.query.time;
-				booking.day = req.query.day;
+				booking.date = req.query.date;
 				booking.status = "sent";
 
 				Venue.find({ _id: req.query.venue_id }, function(err, venues) {
@@ -1252,7 +1272,7 @@ module.exports = function(app) {
 								res.send(err);
 							} else {
 								bookingNotify.details = venues[0].name  + " have invited you to perform on " + 
-																	booking.date + " at " + bookingtime;
+																	booking.date + " at " + booking.time;
 								bookingNotify.pic = venues[0].pic;
 								bookingNotify.option = "yes";
 								bookingNotify.seen = "no";
@@ -1284,6 +1304,7 @@ module.exports = function(app) {
 												fcm.send(message, function(err, response){
 												    if (err) {
 												        console.log("Something has gone wrong!");
+												        res.json("sent");
 												    } else {
 												        console.log("Successfully sent with response: ", response);
 														res.json("sent");
@@ -1361,6 +1382,7 @@ module.exports = function(app) {
 														fcm.send(message, function(err, response){
 														    if (err) {
 														        console.log("Something has gone wrong!");
+														        res.json("sent");
 														    } else {
 														        console.log("Successfully sent with response: ", response);
 																res.json("sent");
@@ -1489,6 +1511,7 @@ module.exports = function(app) {
 												fcm.send(message, function(err, response){
 												    if (err) {
 												        console.log("Something has gone wrong!");
+												        res.json("sent");
 												    } else {
 												        console.log("Successfully sent with response: ", response);
 														res.json("sent");
@@ -1528,7 +1551,7 @@ module.exports = function(app) {
 										console.log(err);
 										res.send(err); 
 									} else {
-										artists[0].splice(artists[0].notifications.indexOf(docs[0]._id), 1);
+										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]._id), 1);
 										artists.save(function(err) {
 											if(err) {
 												console.log(err);
@@ -1571,7 +1594,7 @@ module.exports = function(app) {
 																		fcm.send(message, function(err, response){
 																		    if (err) {
 																		        console.log("Something has gone wrong!");
-																		        res.send(err)
+																		        res.send("jam_accepted");
 																		    } else {
 																		        console.log("Successfully sent with response: ", response);
 																				res.json("jam_accepted");
@@ -1616,7 +1639,7 @@ module.exports = function(app) {
 										console.log(err);
 										res.send(err); 
 									} else {
-										artists[0].splice(artists[0].notifications.indexOf(docs[0]._id), 1);
+										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]._id), 1);
 										artists.save(function(err) {
 											if(err) {
 												console.log(err);
@@ -1664,7 +1687,7 @@ module.exports = function(app) {
 																				fcm.send(message, function(err, response){
 																				    if (err) {
 																				        console.log("Something has gone wrong!");
-																				        res.send(err)
+																				        res.send("jam_rejected");
 																				    } else {
 																				        console.log("Successfully sent with response: ", response);
 																						res.json("jam_rejected");
@@ -1734,7 +1757,7 @@ module.exports = function(app) {
 												fcm.send(message, function(err, response){
 												    if (err) {
 												        console.log("Something has gone wrong!");
-												        res.send(err)
+												        res.send("jam_cancel");
 												    } else {
 												        console.log("Successfully sent with response: ", response);
 														res.json("jam_cancel");
@@ -1790,7 +1813,7 @@ module.exports = function(app) {
 										console.log(err);
 										res.send(err); 
 									} else {
-										artists[0].splice(artists[0].notifications.indexOf(docs[0]._id), 1);
+										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]._id), 1);
 										artists.save(function(err) {
 											if(err) {
 												console.log(err);
@@ -1832,7 +1855,7 @@ module.exports = function(app) {
 																		fcm.send(message, function(err, response){
 																		    if (err) {
 																		        console.log("Something has gone wrong!");
-																		        res.send(err)
+																		        res.send("booking_accepted");
 																		    } else {
 																		        console.log("Successfully sent with response: ", response);
 																				res.json("booking_accepted");
@@ -1893,7 +1916,7 @@ module.exports = function(app) {
 										console.log(err);
 										res.send(err); 
 									} else {
-										artists[0].splice(artists[0].notifications.indexOf(docs[0]), 1);
+										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]), 1);
 										artists.save(function(err) {
 											if(err) {
 												console.log(err);
@@ -1941,7 +1964,7 @@ module.exports = function(app) {
 																				fcm.send(message, function(err, response){
 																				    if (err) {
 																				        console.log("Something has gone wrong!");
-																				        res.send(err)
+																				        res.send("booking_rejected")
 																				    } else {
 																				        console.log("Successfully sent with response: ", response);
 																						res.json("booking_rejected");
@@ -2029,7 +2052,7 @@ module.exports = function(app) {
 													fcm.send(message, function(err, response){
 													    if (err) {
 													        console.log("Something has gone wrong!");
-													        res.send(err)
+													        res.send("booking_cancel")
 													    } else {
 													        console.log("Successfully sent with response: ", response);
 															res.json("booking_cancel");
