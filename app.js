@@ -5,6 +5,7 @@ var app = express();
 var mongoose = require('mongoose');
 
 mongoose.connect('mongodb://pro:pro_123@ds011705.mlab.com:11705/euphony');
+
 console.log("Connected to db");
 
 var port = process.env.PORT || 8080;
@@ -28,30 +29,46 @@ var clients = [];
 
 io.on('connection', function(socket) {
 	console.log('user connected');
+	console.log(clients);
 	socket.on('userId', function(id) {
 		var user = {};
 		user.id = id;
 		user.socket_id = socket.id;
 		user.online = "no";
 		console.log(user);
+
 		var x = clients.every(function(client) {
 			if(client.id == id) {
-				//io.to(client.socket_id).emit('message', { 'message': data, 'frm': frm});
 				return false;
 			} else
 				return true;
 		});
 
-		if(x == false)
+		if(x == true)
 			clients.push(user);
+
+		console.log(clients);
 
 		PendingConversation.find({ to: id }, function(err, messages) {
 			if(err)
 				console.log(err);
 			else {
-				if(messages.length != 0) {
+				var x = messages.length;
+				if(x != 0) {
+					console.log(x);
 					messages.forEach(function(message) {
 						socket.emit('message', message);
+						
+						message.to = "";
+						message.frm = "";
+						message.message = "";
+						
+						message.save(function(err) {
+							if(err) 
+								console.log(err);
+							else 
+								console.log("pendong deleteed");
+						});
 					});
 				}
 			}
@@ -66,7 +83,13 @@ io.on('connection', function(socket) {
 
 		var x = clients.every(function(client) {
 			if(client.id == to) {
-				io.to(client.socket_id).emit('message', { 'message': data, 'frm': frm});
+				console.log("sent" + client.socket_id);
+				var msg = {};
+				msg.message = message;
+				msg.frm = frm;
+				console.log(msg);
+
+				io.to(client.socket_id).emit('message', msg);
 				return false;
 			} else
 				return true;
