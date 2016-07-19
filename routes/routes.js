@@ -121,7 +121,7 @@ module.exports = function(app) {
 					res.end(err);
 				else if(docs.length != 0) {
 					console.log(req.query.f_id + " " + docs[0].__t);
-					res.json(docs[0]._id + "," + docs[0].__t + "," + docs[0].location + "," + docs[0].name); 
+					res.json(docs[0]._id + "-" + docs[0].__t + "-" + docs[0].location + "-" + docs[0].name); 
 				} else if(docs.length == 0) {
 					console.log(req.query.f_id + " not found");
 					res.json("null");
@@ -133,7 +133,7 @@ module.exports = function(app) {
 					res.end(err);
 				else if(docs.length != 0) {
 					console.log(req.query.g_id + " " + docs[0]._id);
-					res.json(docs[0]._id + "," + docs[0].__t + "," + docs[0].location + "," + docs[0].name);
+					res.json(docs[0]._id + "-" + docs[0].__t + "-" + docs[0].location + "-" + docs[0].name);
 				} else if(docs.length == 0) {
 					console.log(req.query.g_id + " not fond");
 					res.json("null");
