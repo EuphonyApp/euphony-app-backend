@@ -383,8 +383,8 @@ module.exports = function(app) {
 				console.log("Error while creating band " + err);
 				res.end(err);
 			} else {
-				var x = bands.members.length;
-				bands.members.forEach(function(member) {
+				var x = band.members.length;
+				band.members.forEach(function(member) {
 				Artist.find({ _id: member }, function(err, docs) {
 					if(err)
 						res.send(err);
@@ -395,15 +395,55 @@ module.exports = function(app) {
 								if(err)
 									res.send(err);
 								else {
-									console.log("created " + band + docs[0].bands);
+									var notify = new Notification();
+
+									notify.details: "You have benn added to the band " + band.name; 
+									notify.pic: band.pic;
+									notify.seen: "no";
+									notify.option: "no";
+									notify.type: "added_to_band";
+									
+									noitfy.save(function(err) {
+										if(err)
+											res.send(err);
+										else {
+											docs[0].notifications.unshift(notify._id);
+											docs[0].save(function(err) {
+												if(err) {
+													console.log(err);
+													res.send(err);
+												} else {
+													var message = {
+														    to: docs[0].gcm_token, // required
+														    notification: {
+														        title: 'Added to new Band',
+														        body: notify.details,
+														        click_action: 'OPEN_ACTIVITY_1'
+														    }
+														};
+
+														fcm.send(message, function(err, response){
+														    if (err) {
+														        console.log("Something has gone wrong!");
+														        res.send(err);
+														       
+														    } else {
+														        console.log("Successfully sent with response: ", response);
+																if(x == 1) {
+																	console.log("creatted band");
+												        			res.json(band._id);
+																}
+												        		else
+												        			--x;
+														    }
+														});
+												}
+											});
+										}
+									});
 								}
 							});
 						}
-
-						       		if(x == 1)
-					        			res.json(band._id);
-					        		else
-					        			--x;
 					}
 				});
 			});
@@ -479,85 +519,6 @@ module.exports = function(app) {
 		});
 	});
 
-	app.post('/artists', function(req, res) {										//dummy funtion to add multiple users
-		var items = req.body;
-		var x = items.length;
-
-		items.forEach(function(item) {
-		
-			var artist = new Artist(item);
-			artist.fbPage = "";
-			artist.dis = "";
-			artist.scloud = "";
-			artist.twitter="";
-
-			artist.save(function(err) {
-				if(err)
-					console.log("Error");
-				else {
-					console.log("Saved " + artist);
-					if(x == 1)
-						res.json({message: "Saved"});
-					else
-						--x;
-				}
-			});
-		});
-	});
-
-	app.get("/usersInPart", function(req, res) {											//fetch users in part, 10 at a time
-		var total = req.query.total;														//params "total", "offset", "type" ,"cur_id" of user
-		var offset = req.query.offset;
-		var type = req.query.type;
-
-		var user = {};
-		var users = [];
-
-		var q = User.find({ type : type }).skip(offset).limit(total);
-		q.exec(function(err, docs) { 
-			var x = docs.length;
-			console.log(x);
-
-			if(docs.length == 0) {
-				return res.json(users);
-			} else {
-
-			docs.forEach(function(doc) {
-				if(doc._id != req.query.cur_id) {
-
-					console.log(doc);
-					user._id = doc._id;
-					user.name = doc.name;
-					user.type = doc.type;
-					user.pic = doc.pic;
-					user.location = doc.location;
-
-					if(type == "bands")
-						user.members = doc.members.length;
-					else {
-						user.members = 0;
-						user.type = doc.genre;
-					}
-
-					user.no_followers = doc.followers.length;
-					if(doc.followers.indexOf(req.query.cur_id) > -1)
-						user.followOrnot = "yes";
-					else
-						user.followOrnot = "no";
-					users.push(user);
-				}
-				
-				if(x == 1) {
-						console.log(total + offset + type + x);
-						console.log(users);
-						res.json(users);
-					}
-					else
-						--x;
-			});
-		}
-		});
-	});
 
 	app.get('/band/list', function(req, res) {													// get the lists of bands for one artist
 																								// params "cur_id" of the artist
@@ -1137,15 +1098,57 @@ module.exports = function(app) {
 									if(err) {
 										console.log(err);
 										res.json(err);
+									} else {
+										var notify = new Notification();
+
+										notify.details: "You have benn added to the band " + band.name; 
+										notify.pic: band.pic;
+										notify.seen: "no";
+										notify.option: "no";
+										notify.type: "added_to_band";
+										
+										noitfy.save(function(err) {
+											if(err)
+												res.send(err);
+											else {
+												docs[0].notifications.unshift(notify._id);
+												docs[0].save(function(err) {
+													if(err) {
+														console.log(err);
+														res.send(err);
+													} else {
+														var message = {
+															    to: docs[0].gcm_token, // required
+															    notification: {
+															        title: 'Added to new Band',
+															        body: notify.details,
+															        click_action: 'OPEN_ACTIVITY_1'
+															    }
+															};
+
+															fcm.send(message, function(err, response){
+															    if (err) {
+															        console.log("Something has gone wrong!");
+															        res.send(err);
+															       
+															    } else {
+															        console.log("Successfully sent with response: ", response);
+																	if(x == 1) {
+																		console.log("creatted band");
+													        			res.json(band._id);
+																	}
+													        		else
+													        			--x;
+															    }
+															});
+													}
+												});
+											}
+										});
 									}
 								});
 							} 
 						}
-						if(x == 1) {
-							console.log("updated");
-							res.json("updated");
-						} else
-							--x;
 					});
 				});
 			}
@@ -1382,10 +1385,10 @@ module.exports = function(app) {
 														fcm.send(message, function(err, response){
 														    if (err) {
 														        console.log("Something has gone wrong!");
-														        res.json("sent");
+														        res.json("sent_booking");
 														    } else {
 														        console.log("Successfully sent with response: ", response);
-																res.json("sent");
+																res.json("sent_booking");
 														    }
 														});
 													}
@@ -1478,7 +1481,7 @@ module.exports = function(app) {
 							console.log(err);
 							res.send(err);
 						} else {
-							jammingNotify.details = jamming.sender + " has asked to jam with him on " + jamming.day + " at "
+							jammingNotify.details = jamming.sender + " has asked to jam together on " + jamming.day + " at "
 							 																+ jamming.time;
 							jammingNotify.pic = docs[0].pic;
 							jammingNotify.option = "yes"; 
@@ -1511,10 +1514,10 @@ module.exports = function(app) {
 												fcm.send(message, function(err, response){
 												    if (err) {
 												        console.log("Something has gone wrong!");
-												        res.json("sent");
+												        res.json("sent_jam");
 												    } else {
 												        console.log("Successfully sent with response: ", response);
-														res.json("sent");
+														res.json("sent_jam");
 												    }
 												});
 										}
