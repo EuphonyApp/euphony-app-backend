@@ -288,7 +288,7 @@ module.exports = function(app) {
 														    if (err) {
 														        console.log("Something has gone wrong!");
 														         console.log(err);
-														        res.send(err);
+														        res.json("followed");
 														       
 														    } else {
 														        console.log("Successfully sent with response: ", response);
@@ -849,7 +849,6 @@ module.exports = function(app) {
 					unread = 0;
 					con.unread = 0;
 
-					console.log(doc);
 					if(doc.users.indexOf(req.query.id) == 1) 
 						con.id = doc.users[0];
 					else if(doc.users.indexOf(req.query.id) == 0)
@@ -870,7 +869,6 @@ module.exports = function(app) {
 
 							if(x != 0) {
 								doc.messages.forEach(function(message) {
-									console.log(message);
 									if(message.read == 'no') {
 										++unread;
 										message.read = "yes";
@@ -882,6 +880,12 @@ module.exports = function(app) {
 												con.unread = unread;
 												if(x == 1) {
 													cons.push(con);
+													if(z == 1) {
+														console.log(cons);
+														res.json(cons);
+													}
+													else
+														--z;
 												}
 												else
 													--x;
@@ -890,20 +894,17 @@ module.exports = function(app) {
 									} else {
 										if(x == 1) {
 											cons.push(con);
-									
+											if(z == 1) {
+												console.log(cons);
+												res.json(cons);
+											} else
+												--z;
 										}
 										else
 											--x;
 									}
 								});
 							}
-
-							if(z == 1) {
-								console.log(cons);
-								res.json(cons);
-							}
-							else
-								--z;
 						}
 					});
 				});
@@ -1306,7 +1307,7 @@ module.exports = function(app) {
 
 												fcm.send(message, function(err, response){
 												    if (err) {
-												        console.log("Something has gone wrong!");
+												        console.log(err);
 												        res.json("sent");
 												    } else {
 												        console.log("Successfully sent with response: ", response);
@@ -1384,7 +1385,7 @@ module.exports = function(app) {
 
 														fcm.send(message, function(err, response){
 														    if (err) {
-														        console.log("Something has gone wrong!");
+														        console.log(err);
 														        res.json("sent_booking");
 														    } else {
 														        console.log("Successfully sent with response: ", response);
@@ -1467,6 +1468,7 @@ module.exports = function(app) {
 			jamming.sender  = docs[0].name;
 			jamming.date = req.query.date;
 			jamming.time = req.query.time;
+			jamming.status = "sent";
 
 			Artist.find({ _id: req.query.sent_to_id }, function(err, artists) {
 				if(err) {
@@ -1481,7 +1483,7 @@ module.exports = function(app) {
 							console.log(err);
 							res.send(err);
 						} else {
-							jammingNotify.details = jamming.sender + " has asked to jam together on " + jamming.day + " at "
+							jammingNotify.details = jamming.sender + " has asked to jam together on " + jamming.date + " at "
 							 																+ jamming.time;
 							jammingNotify.pic = docs[0].pic;
 							jammingNotify.option = "yes"; 
@@ -1513,7 +1515,6 @@ module.exports = function(app) {
 
 												fcm.send(message, function(err, response){
 												    if (err) {
-												        console.log("Something has gone wrong!");
 												        res.json("sent_jam");
 												    } else {
 												        console.log("Successfully sent with response: ", response);
@@ -1555,7 +1556,7 @@ module.exports = function(app) {
 										res.send(err); 
 									} else {
 										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]._id), 1);
-										artists.save(function(err) {
+										artists[0].save(function(err) {
 											if(err) {
 												console.log(err);
 												res.send(err);
@@ -1597,7 +1598,7 @@ module.exports = function(app) {
 																		fcm.send(message, function(err, response){
 																		    if (err) {
 																		        console.log("Something has gone wrong!");
-																		        res.send("jam_accepted");
+																		        res.json("jam_accepted");
 																		    } else {
 																		        console.log("Successfully sent with response: ", response);
 																				res.json("jam_accepted");
@@ -1643,7 +1644,7 @@ module.exports = function(app) {
 										res.send(err); 
 									} else {
 										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]._id), 1);
-										artists.save(function(err) {
+										artists[0].save(function(err) {
 											if(err) {
 												console.log(err);
 												res.send(err);
@@ -1672,31 +1673,25 @@ module.exports = function(app) {
 																		res.send(err);
 																	} else {
 																		console.log("rejected");
-																		jams[0].remove(function(err) {
-																			if(err) {
-																				console.log(err);
-																				res.send(err);
-																			} else {
-																				console.log("removed_jam");
-																				var message = {
-																				    to: result[0].gcm_token, // required
-																				    notification: {
-																				        title: 'Jam request rejected',
-																				        body: rejectNotify.details,
-																				        click_action: 'OPEN_ACTIVITY_1'
-																				    }
-																				};
+																		jams[0].remove();
+																		console.log("removed_jam");
+																		var message = {
+																		    to: result[0].gcm_token, // required
+																		    notification: {
+																		        title: 'Jam request rejected',
+																		        body: rejectNotify.details,
+																		        click_action: 'OPEN_ACTIVITY_1'
+																		    }
+																		};
 
-																				fcm.send(message, function(err, response){
-																				    if (err) {
-																				        console.log("Something has gone wrong!");
-																				        res.send("jam_rejected");
-																				    } else {
-																				        console.log("Successfully sent with response: ", response);
-																						res.json("jam_rejected");
-																				    }
-																				});
-																			}
+																		fcm.send(message, function(err, response){
+																		    if (err) {
+																		        console.log("Something has gone wrong!");
+																		        res.json("jam_rejected");
+																		    } else {
+																		        console.log("Successfully sent with response: ", response);
+																				res.json("jam_rejected");
+																		    }
 																		});
 																	}
 																});
@@ -1743,29 +1738,33 @@ module.exports = function(app) {
 										console.log(err);
 										res.send(err);
 									} else {
-										docs[0].remove(function(err) {
+										artists[0].notifications.unshift(cancelNotfiy._id);
+										artists[0].save(function(err) {
 											if(err) {
 												console.log(err);
-												res.json(err);
+												res.send(err);
 											} else {
-												var message = {
-												    to: artists[0].gcm_token, // required
-												    notification: {
-												        title: 'Jam request canceled',
-												        body: cancelNotfiy.details,
-												        click_action: 'OPEN_ACTIVITY_1'
-												    }
-												};
+													console.log("removed");
 
-												fcm.send(message, function(err, response){
-												    if (err) {
-												        console.log("Something has gone wrong!");
-												        res.send("jam_cancel");
-												    } else {
-												        console.log("Successfully sent with response: ", response);
-														res.json("jam_cancel");
-												    }
-												});
+													docs[0].remove();
+													var message = {
+													    to: artists[0].gcm_token, // required
+													    notification: {
+													        title: 'Jam request canceled',
+													        body: cancelNotfiy.details,
+													        click_action: 'OPEN_ACTIVITY_1'
+													    }
+													};
+
+													fcm.send(message, function(err, response) {
+													    if (err) {
+													        console.log("Something has gone wrong!");
+													        res.json("jam_cancel");
+													    } else {
+													        console.log("Successfully sent with response: ", response);
+															res.json("jam_cancel");
+													    }
+													});
 											}
 										});
 									}
@@ -1817,7 +1816,7 @@ module.exports = function(app) {
 										res.send(err); 
 									} else {
 										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]._id), 1);
-										artists.save(function(err) {
+										artists[0].save(function(err) {
 											if(err) {
 												console.log(err);
 												res.send(err);
@@ -1858,7 +1857,7 @@ module.exports = function(app) {
 																		fcm.send(message, function(err, response){
 																		    if (err) {
 																		        console.log("Something has gone wrong!");
-																		        res.send("booking_accepted");
+																		        res.json("booking_accepted");
 																		    } else {
 																		        console.log("Successfully sent with response: ", response);
 																				res.json("booking_accepted");
@@ -1920,7 +1919,7 @@ module.exports = function(app) {
 										res.send(err); 
 									} else {
 										artists[0].notifications.splice(artists[0].notifications.indexOf(docs[0]), 1);
-										artists.save(function(err) {
+										artists[0].save(function(err) {
 											if(err) {
 												console.log(err);
 												res.send(err);
@@ -1949,32 +1948,25 @@ module.exports = function(app) {
 																		res.send(err);
 																	} else {
 																		console.log("rejected");
-																		books[0].remove(function(err) {
-																			if(err) {
-																				console.log(err);
-																				res.send(err);
-																			} else {
-																				console.log("removed_jam");
-																				var message = {
-																				    to: result[0].gcm_token, // required
-																				    notification: {
-																				        title: 'Jam request rejected',
-																				        body: rejectNotify.details,
-																				        click_action: 'OPEN_ACTIVITY_1'
-																				    }
-																				};
+																		books[0].remove();
+																		console.log("removed_jam");
+																		var message = {
+																		    to: result[0].gcm_token, // required
+																		    notification: {
+																		        title: 'Jam request rejected',
+																		        body: rejectNotify.details,
+																		        click_action: 'OPEN_ACTIVITY_1'
+																		    }
+																		};
 
-																				fcm.send(message, function(err, response){
-																				    if (err) {
-																				        console.log("Something has gone wrong!");
-																				        res.send("booking_rejected")
-																				    } else {
-																				        console.log("Successfully sent with response: ", response);
-																						res.json("booking_rejected");
-																				    }
-																				});
-																				
-																			}
+																		fcm.send(message, function(err, response){
+																		    if (err) {
+																		        console.log("Something has gone wrong!");
+																		        res.json("booking_rejected")
+																		    } else {
+																		        console.log("Successfully sent with response: ", response);
+																				res.json("booking_rejected");
+																		    }
 																		});
 																	}
 																});
@@ -2037,30 +2029,31 @@ module.exports = function(app) {
 										console.log(err);
 										res.send(err);
 									} else {
-										docs[0].remove(function(err) {
+										docs[0].remove();
+										artists[0].notifications.unshift(cancelNotfiy._id);
+										artists[0].save(function(err) {
 											if(err) {
 												console.log(err);
-												res.json(err);
+												res.send(err);
 											} else {
-													artists[0].notifications.unshift(cancelNotfiy._id);
 													var message = {
-													    to: artists[0].gcm_token, // required
-													    notification: {
-													        title: 'Booking request canceled',
-													        body: cancelNotfiy.details,
-													        click_action: 'OPEN_ACTIVITY_1'
-													    }
-													};
+														    to: artists[0].gcm_token, // required
+														    notification: {
+														        title: 'Booking request canceled',
+														        body: cancelNotfiy.details,
+														        click_action: 'OPEN_ACTIVITY_1'
+														    }
+														};
 
-													fcm.send(message, function(err, response){
-													    if (err) {
-													        console.log("Something has gone wrong!");
-													        res.send("booking_cancel")
-													    } else {
-													        console.log("Successfully sent with response: ", response);
-															res.json("booking_cancel");
-													    }
-													});
+														fcm.send(message, function(err, response){
+														    if (err) {
+														        console.log("Something has gone wrong!");
+														        res.json("booking_cancel")
+														    } else {
+														        console.log("Successfully sent with response: ", response);
+																res.json("booking_cancel");
+														    }
+														});
 											}
 										});
 									}
@@ -2128,7 +2121,8 @@ module.exports = function(app) {
 					console.log("no jamming");
 					res.json("Jam");
 				} else {
-					if(docs[0].status == "sent") {
+					console.log(docs[0]);
+						if(docs[0].status == "sent") {
 						console.log("cancel");
 						res.json("Cancel");
 					} else if(docs[0].status == "accepted") {
