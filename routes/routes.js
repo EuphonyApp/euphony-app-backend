@@ -397,11 +397,11 @@ module.exports = function(app) {
 								else {
 									var notify = new Notification();
 
-									notify.details: "You have benn added to the band " + band.name; 
-									notify.pic: band.pic;
-									notify.seen: "no";
-									notify.option: "no";
-									notify.type: "added_to_band";
+									notify.details = "You have benn added to the band " + band.name; 
+									notify.pic = band.pic;
+									notify.seen = "no";
+									notify.option ="no";
+									notify.type = "added_to_band";
 									
 									noitfy.save(function(err) {
 										if(err)
@@ -1101,11 +1101,11 @@ module.exports = function(app) {
 									} else {
 										var notify = new Notification();
 
-										notify.details: "You have benn added to the band " + band.name; 
-										notify.pic: band.pic;
-										notify.seen: "no";
-										notify.option: "no";
-										notify.type: "added_to_band";
+										notify.details =  "You have benn added to the band " + band.name; 
+										notify.pic = band.pic;
+										notify.seen = "no";
+										notify.option = "no";
+										notify.type = "added_to_band";
 										
 										noitfy.save(function(err) {
 											if(err)
