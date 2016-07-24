@@ -1460,7 +1460,7 @@ module.exports = function(app) {
 
 	app.post("/jam/send", function(req, res) {
 		var jammingNotify = new Notification();
-		var jammming = new Jamming();
+		var jamming = new Jamming();
 
 		Artist.find({ _id: req.query.sender_id }, function(err, docs) {
 			jamming.sender_id = docs[0]._id;
