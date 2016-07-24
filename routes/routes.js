@@ -1487,7 +1487,7 @@ module.exports = function(app) {
 							jammingNotify.option = "yes"; 
 							jammingNotify.type = "jamming";
 							jammingNotify.seen = "no";
-							jammingNotify._id = jamming._id;
+							jammingNotify.attached_id = jamming._id;
 
 							jammingNotify.save(function(err) {
 								if(err) {
